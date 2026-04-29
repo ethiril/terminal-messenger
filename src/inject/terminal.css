@@ -1,0 +1,292 @@
+:root {
+  --tm-bg: #050805;
+  --tm-panel: #071107;
+  --tm-panel-2: #0b180b;
+  --tm-text: #d8f9d3;
+  --tm-muted: #80a880;
+  --tm-accent: #70ff7b;
+  --tm-accent-soft: rgba(112, 255, 123, 0.16);
+  --tm-border: rgba(112, 255, 123, 0.35);
+  --tm-shadow: rgba(112, 255, 123, 0.12);
+}
+
+body.tm-theme-amber {
+  --tm-bg: #0d0902;
+  --tm-panel: #181006;
+  --tm-panel-2: #211607;
+  --tm-text: #fff0c2;
+  --tm-muted: #c6a85d;
+  --tm-accent: #ffbf3f;
+  --tm-accent-soft: rgba(255, 191, 63, 0.15);
+  --tm-border: rgba(255, 191, 63, 0.35);
+  --tm-shadow: rgba(255, 191, 63, 0.12);
+}
+
+body.tm-theme-cyan {
+  --tm-bg: #02080d;
+  --tm-panel: #06131a;
+  --tm-panel-2: #071b24;
+  --tm-text: #d2f8ff;
+  --tm-muted: #7db8c7;
+  --tm-accent: #55ddff;
+  --tm-accent-soft: rgba(85, 221, 255, 0.16);
+  --tm-border: rgba(85, 221, 255, 0.35);
+  --tm-shadow: rgba(85, 221, 255, 0.12);
+}
+
+body.tm-theme-mono {
+  --tm-bg: #080808;
+  --tm-panel: #111111;
+  --tm-panel-2: #181818;
+  --tm-text: #eeeeee;
+  --tm-muted: #9a9a9a;
+  --tm-accent: #dddddd;
+  --tm-accent-soft: rgba(221, 221, 221, 0.12);
+  --tm-border: rgba(221, 221, 221, 0.28);
+  --tm-shadow: rgba(255, 255, 255, 0.08);
+}
+
+body.tm-terminal-theme,
+body.tm-terminal-theme #facebook,
+body.tm-terminal-theme [role='main'],
+body.tm-terminal-theme [role='navigation'],
+body.tm-terminal-theme [role='complementary'] {
+  background: var(--tm-bg) !important;
+  color: var(--tm-text) !important;
+}
+
+body.tm-terminal-theme {
+  --web-wash: var(--tm-bg) !important;
+  --surface-background: var(--tm-bg) !important;
+  --card-background: var(--tm-panel) !important;
+  --comment-background: var(--tm-panel-2) !important;
+  --secondary-button-background: var(--tm-panel-2) !important;
+  --primary-text: var(--tm-text) !important;
+  --secondary-text: var(--tm-muted) !important;
+  --placeholder-text: var(--tm-muted) !important;
+  --accent: var(--tm-accent) !important;
+  --blue-link: var(--tm-accent) !important;
+  --divider: var(--tm-border) !important;
+  scrollbar-color: var(--tm-accent) var(--tm-bg) !important;
+}
+
+body.tm-terminal-theme *,
+body.tm-terminal-theme *::before,
+body.tm-terminal-theme *::after {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace !important;
+  border-radius: 0 !important;
+  text-shadow: none !important;
+}
+
+body.tm-terminal-theme a,
+body.tm-terminal-theme span,
+body.tm-terminal-theme div,
+body.tm-terminal-theme p,
+body.tm-terminal-theme h1,
+body.tm-terminal-theme h2,
+body.tm-terminal-theme h3,
+body.tm-terminal-theme input,
+body.tm-terminal-theme textarea,
+body.tm-terminal-theme [contenteditable='true'] {
+  color: var(--tm-text) !important;
+}
+
+body.tm-terminal-theme svg {
+  color: var(--tm-accent) !important;
+  fill: currentColor !important;
+}
+
+body.tm-terminal-theme img,
+body.tm-terminal-theme video,
+body.tm-terminal-theme canvas {
+  border-radius: 0 !important;
+}
+
+body.tm-terminal-theme input,
+body.tm-terminal-theme textarea,
+body.tm-terminal-theme [contenteditable='true'],
+body.tm-terminal-theme [role='textbox'] {
+  background: var(--tm-panel) !important;
+  color: var(--tm-text) !important;
+  border: 1px solid var(--tm-border) !important;
+  outline: none !important;
+  caret-color: var(--tm-accent) !important;
+  box-shadow: inset 0 0 0 1px var(--tm-shadow) !important;
+}
+
+body.tm-terminal-theme input:focus,
+body.tm-terminal-theme textarea:focus,
+body.tm-terminal-theme [contenteditable='true']:focus,
+body.tm-terminal-theme [role='textbox']:focus {
+  border-color: var(--tm-accent) !important;
+  box-shadow: 0 0 0 1px var(--tm-accent), 0 0 24px var(--tm-shadow) !important;
+}
+
+body.tm-terminal-theme [role='button'],
+body.tm-terminal-theme button,
+body.tm-terminal-theme a[role='link'],
+body.tm-terminal-theme [role='row'] {
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease !important;
+}
+
+body.tm-terminal-theme [role='button']:hover,
+body.tm-terminal-theme button:hover,
+body.tm-terminal-theme a[role='link']:hover,
+body.tm-terminal-theme [role='row']:hover {
+  background: var(--tm-accent-soft) !important;
+  outline: 1px solid var(--tm-border) !important;
+}
+
+body.tm-terminal-theme [aria-selected='true'],
+body.tm-terminal-theme [role='link'][aria-current='page'],
+body.tm-terminal-theme [role='tab'][aria-selected='true'] {
+  background: var(--tm-accent-soft) !important;
+  border-left: 2px solid var(--tm-accent) !important;
+}
+
+body.tm-terminal-theme [data-pagelet],
+body.tm-terminal-theme [role='dialog'],
+body.tm-terminal-theme [role='menu'],
+body.tm-terminal-theme [aria-label*='Conversation'],
+body.tm-terminal-theme [aria-label*='Chats'],
+body.tm-terminal-theme [aria-label*='Messenger'] {
+  background-color: var(--tm-bg) !important;
+}
+
+body.tm-terminal-theme [style*='border-radius'],
+body.tm-terminal-theme [style*='box-shadow'] {
+  box-shadow: none !important;
+}
+
+body.tm-terminal-theme [class*='x1lliihq'],
+body.tm-terminal-theme [dir='auto'] {
+  letter-spacing: 0.005em !important;
+}
+
+body.tm-compact [role='banner'],
+body.tm-compact [aria-label='Facebook'],
+body.tm-compact [aria-label='Meta'],
+body.tm-compact [aria-label='Account controls and settings'] {
+  max-height: 40px !important;
+  overflow: hidden !important;
+}
+
+body.tm-compact [role='main'] {
+  gap: 0 !important;
+}
+
+body.tm-compact [role='row'],
+body.tm-compact [role='button'],
+body.tm-compact a[role='link'] {
+  margin-top: 1px !important;
+  margin-bottom: 1px !important;
+}
+
+#tm-command-root {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+}
+
+#tm-command-root.tm-command-open {
+  pointer-events: auto;
+}
+
+#tm-command-root .tm-command-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+#tm-command-root.tm-command-open .tm-command-backdrop {
+  opacity: 1;
+}
+
+#tm-command-root .tm-command-panel {
+  position: absolute;
+  left: 50%;
+  top: 12vh;
+  width: min(760px, calc(100vw - 32px));
+  transform: translateX(-50%) translateY(-10px);
+  opacity: 0;
+  background: var(--tm-panel);
+  color: var(--tm-text);
+  border: 1px solid var(--tm-border);
+  box-shadow: 0 0 40px var(--tm-shadow), 0 20px 80px rgba(0, 0, 0, 0.55);
+  padding: 14px;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+#tm-command-root.tm-command-open .tm-command-panel {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+#tm-command-root .tm-command-title {
+  color: var(--tm-accent);
+  font-size: 13px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+#tm-command-root .tm-command-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--tm-bg);
+  color: var(--tm-text);
+  border: 1px solid var(--tm-border);
+  padding: 12px;
+  font-size: 16px;
+  outline: none;
+  caret-color: var(--tm-accent);
+}
+
+#tm-command-root .tm-command-input:focus {
+  border-color: var(--tm-accent);
+  box-shadow: 0 0 0 1px var(--tm-accent), 0 0 20px var(--tm-shadow);
+}
+
+#tm-command-root .tm-command-hint {
+  color: var(--tm-muted);
+  font-size: 12px;
+  margin: 10px 0;
+}
+
+#tm-command-root .tm-command-output {
+  min-height: 92px;
+  max-height: 280px;
+  overflow: auto;
+  margin: 0;
+  padding: 12px;
+  color: var(--tm-text);
+  background: var(--tm-bg);
+  border: 1px solid var(--tm-border);
+  white-space: pre-wrap;
+}
+
+#tm-toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 2147483647;
+  background: var(--tm-panel);
+  color: var(--tm-accent);
+  border: 1px solid var(--tm-border);
+  box-shadow: 0 0 32px var(--tm-shadow);
+  padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+#tm-toast.tm-toast-visible {
+  opacity: 1;
+  transform: translateY(0);
+}

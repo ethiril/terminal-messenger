@@ -1,0 +1,16 @@
+{
+  "homeUrl": "https://www.facebook.com/messages",
+  "allowedHosts": [
+    "facebook.com",
+    "www.facebook.com",
+    "m.facebook.com",
+    "messenger.com",
+    "www.messenger.com"
+  ],
+  "theme": "green",
+  "compactByDefault": true,
+  "window": {
+    "width": 1280,
+    "height": 860
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "name": "terminal-messenger",
+  "version": "0.1.0",
+  "description": "A terminal-styled desktop wrapper for Facebook Messages. No private Messenger APIs; only web UI theming and local shortcuts.",
+  "main": "src/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "check": "node --check src/main.js && node --check src/inject/terminal.js",
+    "clean-profile": "node scripts/clean-profile.js",
+    "dist": "electron-builder --mac",
+    "pack": "electron-builder --mac --dir"
+  },
+  "build": {
+    "appId": "com.ethiril.terminal-messenger",
+    "productName": "Terminal Messenger",
+    "files": [
+      "src/**/*",
+      "config/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.social-networking",
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] },
+        { "target": "zip", "arch": ["arm64", "x64"] }
+      ],
+      "icon": "build/icon.icns",
+      "identity": null
+    },
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    }
+  },
+  "keywords": [
+    "messenger",
+    "electron",
+    "terminal",
+    "tui",
+    "facebook"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "^26.8.1"
+  }
+}
