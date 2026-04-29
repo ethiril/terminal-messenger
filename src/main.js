@@ -146,6 +146,20 @@ function createMenu() {
       ]
     },
     {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'pasteAndMatchStyle' },
+        { role: 'delete' },
+        { role: 'selectAll' }
+      ]
+    },
+    {
       label: 'View',
       submenu: [
         { label: 'Command Palette', accelerator: 'CmdOrCtrl+Shift+P', click: (_, win) => win?.webContents.executeJavaScript('window.TerminalMessenger?.openPalette?.()') },

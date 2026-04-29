@@ -1,81 +1,93 @@
 :root {
   --tm-bg: #050805;
-  --tm-panel: #071107;
-  --tm-panel-2: #0b180b;
-  --tm-text: #d8f9d3;
-  --tm-muted: #80a880;
+  --tm-text: #c8e8c0;
+  --tm-muted: #5a8a5a;
   --tm-accent: #70ff7b;
-  --tm-accent-soft: rgba(112, 255, 123, 0.16);
-  --tm-border: rgba(112, 255, 123, 0.35);
-  --tm-shadow: rgba(112, 255, 123, 0.12);
+  --tm-dim: #1a3a1a;
 }
 
 body.tm-theme-amber {
-  --tm-bg: #0d0902;
-  --tm-panel: #181006;
-  --tm-panel-2: #211607;
-  --tm-text: #fff0c2;
-  --tm-muted: #c6a85d;
+  --tm-bg: #0a0700;
+  --tm-text: #f5d99a;
+  --tm-muted: #a07a30;
   --tm-accent: #ffbf3f;
-  --tm-accent-soft: rgba(255, 191, 63, 0.15);
-  --tm-border: rgba(255, 191, 63, 0.35);
-  --tm-shadow: rgba(255, 191, 63, 0.12);
+  --tm-dim: #3a2a08;
 }
 
 body.tm-theme-cyan {
   --tm-bg: #02080d;
-  --tm-panel: #06131a;
-  --tm-panel-2: #071b24;
-  --tm-text: #d2f8ff;
-  --tm-muted: #7db8c7;
+  --tm-text: #c0e8f5;
+  --tm-muted: #5a90a8;
   --tm-accent: #55ddff;
-  --tm-accent-soft: rgba(85, 221, 255, 0.16);
-  --tm-border: rgba(85, 221, 255, 0.35);
-  --tm-shadow: rgba(85, 221, 255, 0.12);
+  --tm-dim: #0a2530;
 }
 
 body.tm-theme-mono {
   --tm-bg: #080808;
-  --tm-panel: #111111;
-  --tm-panel-2: #181818;
-  --tm-text: #eeeeee;
-  --tm-muted: #9a9a9a;
-  --tm-accent: #dddddd;
-  --tm-accent-soft: rgba(221, 221, 221, 0.12);
-  --tm-border: rgba(221, 221, 221, 0.28);
-  --tm-shadow: rgba(255, 255, 255, 0.08);
+  --tm-text: #d8d8d8;
+  --tm-muted: #777777;
+  --tm-accent: #cccccc;
+  --tm-dim: #222222;
 }
 
+/* ───────────── flatten and monospace everything ───────────── */
 body.tm-terminal-theme,
-body.tm-terminal-theme #facebook,
-body.tm-terminal-theme [role='main'],
-body.tm-terminal-theme [role='navigation'],
-body.tm-terminal-theme [role='complementary'] {
-  background: var(--tm-bg) !important;
-  color: var(--tm-text) !important;
+body.tm-terminal-theme *,
+body.tm-terminal-theme *::before,
+body.tm-terminal-theme *::after {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace !important;
+  font-weight: normal !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  background-image: none !important;
+  animation: none !important;
+  transition: none !important;
+  letter-spacing: 0 !important;
 }
 
 body.tm-terminal-theme {
+  background: var(--tm-bg) !important;
+  color: var(--tm-text) !important;
   --web-wash: var(--tm-bg) !important;
   --surface-background: var(--tm-bg) !important;
-  --card-background: var(--tm-panel) !important;
-  --comment-background: var(--tm-panel-2) !important;
-  --secondary-button-background: var(--tm-panel-2) !important;
+  --card-background: var(--tm-bg) !important;
+  --card-background-flat: var(--tm-bg) !important;
+  --comment-background: var(--tm-bg) !important;
+  --secondary-button-background: transparent !important;
+  --hover-overlay: var(--tm-dim) !important;
   --primary-text: var(--tm-text) !important;
   --secondary-text: var(--tm-muted) !important;
   --placeholder-text: var(--tm-muted) !important;
   --accent: var(--tm-accent) !important;
   --blue-link: var(--tm-accent) !important;
-  --divider: var(--tm-border) !important;
-  scrollbar-color: var(--tm-accent) var(--tm-bg) !important;
+  --divider: var(--tm-dim) !important;
+  scrollbar-color: var(--tm-dim) var(--tm-bg) !important;
+  scrollbar-width: thin !important;
 }
 
-body.tm-terminal-theme *,
-body.tm-terminal-theme *::before,
-body.tm-terminal-theme *::after {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace !important;
-  border-radius: 0 !important;
-  text-shadow: none !important;
+/* ───────────── kill backgrounds and borders everywhere ───────────── */
+body.tm-terminal-theme div,
+body.tm-terminal-theme span,
+body.tm-terminal-theme section,
+body.tm-terminal-theme article,
+body.tm-terminal-theme nav,
+body.tm-terminal-theme aside,
+body.tm-terminal-theme header,
+body.tm-terminal-theme main,
+body.tm-terminal-theme footer,
+body.tm-terminal-theme ul,
+body.tm-terminal-theme li,
+body.tm-terminal-theme [role='row'],
+body.tm-terminal-theme [role='gridcell'],
+body.tm-terminal-theme [role='button'],
+body.tm-terminal-theme [role='link'],
+body.tm-terminal-theme [role='menu'],
+body.tm-terminal-theme [role='menuitem'],
+body.tm-terminal-theme [role='dialog'],
+body.tm-terminal-theme [role='tabpanel'] {
+  background-color: transparent !important;
+  border-color: var(--tm-dim) !important;
 }
 
 body.tm-terminal-theme a,
@@ -85,103 +97,163 @@ body.tm-terminal-theme p,
 body.tm-terminal-theme h1,
 body.tm-terminal-theme h2,
 body.tm-terminal-theme h3,
-body.tm-terminal-theme input,
-body.tm-terminal-theme textarea,
-body.tm-terminal-theme [contenteditable='true'] {
+body.tm-terminal-theme h4,
+body.tm-terminal-theme strong,
+body.tm-terminal-theme b {
   color: var(--tm-text) !important;
+  font-size: 13px !important;
+  line-height: 1.4 !important;
 }
 
-body.tm-terminal-theme svg {
-  color: var(--tm-accent) !important;
-  fill: currentColor !important;
+body.tm-terminal-theme a,
+body.tm-terminal-theme a *,
+body.tm-terminal-theme [role='link'],
+body.tm-terminal-theme [role='link'] * {
+  text-decoration: none !important;
 }
 
+/* ───────────── strip imagery outside the message log ───────────── */
 body.tm-terminal-theme img,
+body.tm-terminal-theme svg,
 body.tm-terminal-theme video,
-body.tm-terminal-theme canvas {
-  border-radius: 0 !important;
+body.tm-terminal-theme canvas,
+body.tm-terminal-theme i[data-visualcompletion='css-img'],
+body.tm-terminal-theme [role='img'],
+body.tm-terminal-theme [data-visualcompletion='ignore-dynamic'] {
+  display: none !important;
 }
 
+/* re-enable media inside the active conversation thread only */
+body.tm-terminal-theme [role='log'] img,
+body.tm-terminal-theme [role='log'] video,
+body.tm-terminal-theme [role='log'] canvas,
+body.tm-terminal-theme [aria-label*='Messages in conversation'] img,
+body.tm-terminal-theme [aria-label*='Messages in conversation'] video,
+body.tm-terminal-theme [aria-label*='Messages in conversation'] canvas,
+body.tm-terminal-theme [data-tm-thread] img,
+body.tm-terminal-theme [data-tm-thread] video,
+body.tm-terminal-theme [data-tm-thread] canvas {
+  display: revert !important;
+  border-radius: 0 !important;
+  border: 1px solid var(--tm-dim) !important;
+  max-width: 320px !important;
+  max-height: 240px !important;
+}
+
+/* ───────────── hide the entire facebook chrome ───────────── */
+body.tm-terminal-theme [role='banner'],
+body.tm-terminal-theme [aria-label='Stories'],
+body.tm-terminal-theme [aria-label='Watch'],
+body.tm-terminal-theme [aria-label='Marketplace'],
+body.tm-terminal-theme [aria-label='Reels'],
+body.tm-terminal-theme [aria-label='Groups'],
+body.tm-terminal-theme [aria-label='Notes'],
+body.tm-terminal-theme [aria-label='Account controls and settings'],
+body.tm-terminal-theme [aria-label='Your profile'],
+body.tm-terminal-theme [aria-label='Create'],
+body.tm-terminal-theme [aria-label='Notifications'],
+body.tm-terminal-theme [aria-label='Menu'][role='button'],
+body.tm-terminal-theme [data-pagelet='LeftRail'],
+body.tm-terminal-theme [data-pagelet='Stories'] {
+  display: none !important;
+}
+
+/* keep main and the messenger panel; collapse padding aggressively */
+body.tm-terminal-theme [role='main'] {
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+/* ───────────── tighten chat list rows ───────────── */
+body.tm-terminal-theme [role='row'],
+body.tm-terminal-theme [role='gridcell'],
+body.tm-terminal-theme [role='listitem'] {
+  padding: 1px 6px !important;
+  margin: 0 !important;
+  min-height: unset !important;
+  height: auto !important;
+}
+
+body.tm-terminal-theme [role='row']:hover,
+body.tm-terminal-theme [role='gridcell']:hover,
+body.tm-terminal-theme a[role='link']:hover,
+body.tm-terminal-theme [role='button']:hover {
+  background: var(--tm-dim) !important;
+  outline: none !important;
+}
+
+body.tm-terminal-theme [aria-selected='true'],
+body.tm-terminal-theme [role='link'][aria-current='page'],
+body.tm-terminal-theme [role='tab'][aria-selected='true'] {
+  background: var(--tm-dim) !important;
+  border-left: 2px solid var(--tm-accent) !important;
+  padding-left: 4px !important;
+}
+
+/* ───────────── strip message bubble decorations ───────────── */
+body.tm-terminal-theme [role='log'] *,
+body.tm-terminal-theme [aria-label*='Messages in conversation'] *,
+body.tm-terminal-theme [data-tm-thread] * {
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+
+/* keep bubble text aligned as plain log lines */
+body.tm-terminal-theme [role='log'] [role='row'],
+body.tm-terminal-theme [aria-label*='Messages in conversation'] [role='row'] {
+  padding: 1px 8px !important;
+  display: block !important;
+}
+
+/* ───────────── inputs ───────────── */
 body.tm-terminal-theme input,
 body.tm-terminal-theme textarea,
 body.tm-terminal-theme [contenteditable='true'],
 body.tm-terminal-theme [role='textbox'] {
-  background: var(--tm-panel) !important;
+  background: transparent !important;
   color: var(--tm-text) !important;
-  border: 1px solid var(--tm-border) !important;
+  border: none !important;
+  border-bottom: 1px solid var(--tm-dim) !important;
   outline: none !important;
   caret-color: var(--tm-accent) !important;
-  box-shadow: inset 0 0 0 1px var(--tm-shadow) !important;
+  box-shadow: none !important;
+  padding: 4px 6px !important;
+  font-size: 13px !important;
 }
 
 body.tm-terminal-theme input:focus,
 body.tm-terminal-theme textarea:focus,
 body.tm-terminal-theme [contenteditable='true']:focus,
 body.tm-terminal-theme [role='textbox']:focus {
-  border-color: var(--tm-accent) !important;
-  box-shadow: 0 0 0 1px var(--tm-accent), 0 0 24px var(--tm-shadow) !important;
-}
-
-body.tm-terminal-theme [role='button'],
-body.tm-terminal-theme button,
-body.tm-terminal-theme a[role='link'],
-body.tm-terminal-theme [role='row'] {
-  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease !important;
-}
-
-body.tm-terminal-theme [role='button']:hover,
-body.tm-terminal-theme button:hover,
-body.tm-terminal-theme a[role='link']:hover,
-body.tm-terminal-theme [role='row']:hover {
-  background: var(--tm-accent-soft) !important;
-  outline: 1px solid var(--tm-border) !important;
-}
-
-body.tm-terminal-theme [aria-selected='true'],
-body.tm-terminal-theme [role='link'][aria-current='page'],
-body.tm-terminal-theme [role='tab'][aria-selected='true'] {
-  background: var(--tm-accent-soft) !important;
-  border-left: 2px solid var(--tm-accent) !important;
-}
-
-body.tm-terminal-theme [data-pagelet],
-body.tm-terminal-theme [role='dialog'],
-body.tm-terminal-theme [role='menu'],
-body.tm-terminal-theme [aria-label*='Conversation'],
-body.tm-terminal-theme [aria-label*='Chats'],
-body.tm-terminal-theme [aria-label*='Messenger'] {
-  background-color: var(--tm-bg) !important;
-}
-
-body.tm-terminal-theme [style*='border-radius'],
-body.tm-terminal-theme [style*='box-shadow'] {
+  border-bottom-color: var(--tm-accent) !important;
   box-shadow: none !important;
 }
 
-body.tm-terminal-theme [class*='x1lliihq'],
-body.tm-terminal-theme [dir='auto'] {
-  letter-spacing: 0.005em !important;
+/* allow paste on password / text inputs even if site tries to disable it */
+body.tm-terminal-theme input[type='password'],
+body.tm-terminal-theme input[type='text'],
+body.tm-terminal-theme input[type='email'] {
+  -webkit-user-select: text !important;
+  user-select: text !important;
 }
 
-body.tm-compact [role='banner'],
-body.tm-compact [aria-label='Facebook'],
-body.tm-compact [aria-label='Meta'],
-body.tm-compact [aria-label='Account controls and settings'] {
-  max-height: 40px !important;
-  overflow: hidden !important;
+/* ───────────── scrollbars ───────────── */
+body.tm-terminal-theme *::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+body.tm-terminal-theme *::-webkit-scrollbar-track {
+  background: var(--tm-bg) !important;
+}
+body.tm-terminal-theme *::-webkit-scrollbar-thumb {
+  background: var(--tm-dim) !important;
+  border-radius: 0 !important;
+}
+body.tm-terminal-theme *::-webkit-scrollbar-thumb:hover {
+  background: var(--tm-muted) !important;
 }
 
-body.tm-compact [role='main'] {
-  gap: 0 !important;
-}
-
-body.tm-compact [role='row'],
-body.tm-compact [role='button'],
-body.tm-compact a[role='link'] {
-  margin-top: 1px !important;
-  margin-bottom: 1px !important;
-}
-
+/* ───────────── command palette ───────────── */
 #tm-command-root {
   position: fixed;
   inset: 0;
@@ -197,9 +269,8 @@ body.tm-compact a[role='link'] {
 #tm-command-root .tm-command-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.62);
+  background: rgba(0, 0, 0, 0.7);
   opacity: 0;
-  transition: opacity 120ms ease;
 }
 
 #tm-command-root.tm-command-open .tm-command-backdrop {
@@ -209,84 +280,117 @@ body.tm-compact a[role='link'] {
 #tm-command-root .tm-command-panel {
   position: absolute;
   left: 50%;
-  top: 12vh;
-  width: min(760px, calc(100vw - 32px));
-  transform: translateX(-50%) translateY(-10px);
+  top: 18vh;
+  width: min(720px, calc(100vw - 32px));
+  transform: translateX(-50%);
   opacity: 0;
-  background: var(--tm-panel);
+  background: var(--tm-bg);
   color: var(--tm-text);
-  border: 1px solid var(--tm-border);
-  box-shadow: 0 0 40px var(--tm-shadow), 0 20px 80px rgba(0, 0, 0, 0.55);
-  padding: 14px;
-  transition: opacity 120ms ease, transform 120ms ease;
+  border: 1px solid var(--tm-dim);
+  padding: 10px 12px;
 }
 
 #tm-command-root.tm-command-open .tm-command-panel {
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
 }
 
 #tm-command-root .tm-command-title {
-  color: var(--tm-accent);
-  font-size: 13px;
-  margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  color: var(--tm-muted);
+  font-size: 12px;
+  margin-bottom: 6px;
 }
 
 #tm-command-root .tm-command-input {
   width: 100%;
   box-sizing: border-box;
-  background: var(--tm-bg);
+  background: transparent;
   color: var(--tm-text);
-  border: 1px solid var(--tm-border);
-  padding: 12px;
-  font-size: 16px;
+  border: none;
+  border-bottom: 1px solid var(--tm-dim);
+  padding: 6px 0;
+  font-size: 14px;
   outline: none;
   caret-color: var(--tm-accent);
 }
 
 #tm-command-root .tm-command-input:focus {
-  border-color: var(--tm-accent);
-  box-shadow: 0 0 0 1px var(--tm-accent), 0 0 20px var(--tm-shadow);
+  border-bottom-color: var(--tm-accent);
 }
 
 #tm-command-root .tm-command-hint {
   color: var(--tm-muted);
-  font-size: 12px;
-  margin: 10px 0;
+  font-size: 11px;
+  margin: 8px 0;
 }
 
 #tm-command-root .tm-command-output {
-  min-height: 92px;
+  min-height: 60px;
   max-height: 280px;
   overflow: auto;
   margin: 0;
-  padding: 12px;
+  padding: 8px 0 0 0;
   color: var(--tm-text);
-  background: var(--tm-bg);
-  border: 1px solid var(--tm-border);
+  background: transparent;
+  border: none;
+  border-top: 1px dashed var(--tm-dim);
   white-space: pre-wrap;
+  font-size: 12px;
 }
 
+/* ───────────── toast ───────────── */
 #tm-toast {
   position: fixed;
-  right: 18px;
-  bottom: 18px;
+  right: 12px;
+  bottom: 12px;
   z-index: 2147483647;
-  background: var(--tm-panel);
+  background: var(--tm-bg);
   color: var(--tm-accent);
-  border: 1px solid var(--tm-border);
-  box-shadow: 0 0 32px var(--tm-shadow);
-  padding: 10px 12px;
+  border: 1px solid var(--tm-dim);
+  padding: 4px 8px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
   opacity: 0;
-  transform: translateY(8px);
   pointer-events: none;
-  transition: opacity 120ms ease, transform 120ms ease;
 }
 
 #tm-toast.tm-toast-visible {
   opacity: 1;
-  transform: translateY(0);
+}
+
+/* ───────────── status line (zsh-style prompt at top) ───────────── */
+#tm-statusline {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 22px;
+  z-index: 2147483646;
+  background: var(--tm-bg);
+  color: var(--tm-muted);
+  border-bottom: 1px solid var(--tm-dim);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 11px;
+  pointer-events: none;
+  user-select: none;
+}
+
+#tm-statusline .tm-prompt-arrow {
+  color: var(--tm-accent);
+  margin-right: 6px;
+}
+
+#tm-statusline .tm-prompt-path {
+  color: var(--tm-text);
+}
+
+#tm-statusline .tm-prompt-hint {
+  margin-left: auto;
+  color: var(--tm-muted);
+}
+
+body.tm-terminal-theme {
+  padding-top: 22px !important;
 }

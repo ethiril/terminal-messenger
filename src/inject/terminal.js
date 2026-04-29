@@ -6,7 +6,7 @@
     compact: 'terminalMessenger.compact'
   };
 
-  if (window.TerminalMessenger?.version === '0.1.0') {
+  if (window.TerminalMessenger?.version === '0.2.0') {
     window.TerminalMessenger.apply?.();
     return;
   }
@@ -20,6 +20,72 @@
     return THEMES.includes(theme) ? theme : 'green';
   }
 
+  function ensureStatusline() {
+    let bar = document.getElementById('tm-statusline');
+    if (bar) return bar;
+    bar = document.createElement('div');
+    bar.id = 'tm-statusline';
+    bar.innerHTML = `
+      <span class="tm-prompt-arrow">❯</span><span class="tm-prompt-path">~/messenger</span>
+      <span class="tm-prompt-hint">/ help · ctrl+shift+p palette · ctrl+shift+t theme</span>
+    `;
+    document.documentElement.appendChild(bar);
+    return bar;
+  }
+
+  function updateStatusline() {
+    const bar = ensureStatusline();
+    const path = bar.querySelector('.tm-prompt-path');
+    const threadName = getActiveThreadName();
+    path.textContent = threadName ? `~/messenger/${threadName}` : '~/messenger';
+  }
+
+  function getActiveThreadName() {
+    const candidates = [
+      '[role="main"] h1',
+      '[role="main"] h2',
+      '[aria-label*="Conversation with"]',
+      '[aria-label*="Messages in conversation with"]'
+    ];
+    for (const sel of candidates) {
+      const el = document.querySelector(sel);
+      if (!el) continue;
+      const label = el.getAttribute('aria-label') || el.textContent;
+      if (!label) continue;
+      const cleaned = label
+        .replace(/^Messages in conversation with\s+/i, '')
+        .replace(/^Conversation with\s+/i, '')
+        .trim();
+      if (cleaned) return cleaned.slice(0, 60);
+    }
+    return null;
+  }
+
+  function tagActiveThread() {
+    const thread = document.querySelector('[role="log"], [aria-label*="Messages in conversation"]');
+    if (thread && !thread.hasAttribute('data-tm-thread')) {
+      document.querySelectorAll('[data-tm-thread]').forEach((node) => node.removeAttribute('data-tm-thread'));
+      thread.setAttribute('data-tm-thread', 'true');
+    }
+  }
+
+  function unblockPaste() {
+    document.querySelectorAll('input, textarea').forEach((el) => {
+      if (el.__tmPasteUnblocked) return;
+      el.__tmPasteUnblocked = true;
+      el.onpaste = null;
+      el.oncopy = null;
+      el.oncut = null;
+      el.removeAttribute('onpaste');
+      el.removeAttribute('oncopy');
+      el.removeAttribute('oncut');
+      // some sites set autocomplete=off + paste blockers on password fields; be sure
+      el.addEventListener('paste', (event) => {
+        event.stopImmediatePropagation();
+      }, true);
+    });
+  }
+
   function apply() {
     const body = document.body;
     if (!body) return;
@@ -29,6 +95,11 @@
 
     for (const theme of THEMES) body.classList.remove(`tm-theme-${theme}`);
     body.classList.add(`tm-theme-${normaliseTheme(state.theme)}`);
+
+    ensureStatusline();
+    updateStatusline();
+    tagActiveThread();
+    unblockPaste();
   }
 
   function setTheme(theme) {
@@ -108,9 +179,9 @@
     root.innerHTML = `
       <div class="tm-command-backdrop" data-tm-close></div>
       <section class="tm-command-panel" role="dialog" aria-modal="true" aria-label="Terminal Messenger command palette">
-        <div class="tm-command-title">Terminal Messenger</div>
+        <div class="tm-command-title">~/messenger %</div>
         <input class="tm-command-input" autocomplete="off" autocorrect="off" spellcheck="false" placeholder=":help" />
-        <div class="tm-command-hint">Commands: help · theme green|amber|cyan|mono · compact on|off · focus message|search · unread · reload</div>
+        <div class="tm-command-hint">help · theme green|amber|cyan|mono · compact on|off · focus message|search · unread · reload</div>
         <pre class="tm-command-output"></pre>
       </section>
     `;
@@ -159,20 +230,16 @@
     const command = raw.replace(/^:/, '').trim();
     if (!command || command === 'help') {
       return [
-        'Terminal Messenger commands',
+        'commands',
         '',
         ':focus message    focus the message composer',
-        ':focus search     focus Messenger search',
-        ':theme green      use green terminal accent',
-        ':theme amber      use amber terminal accent',
-        ':theme cyan       use cyan terminal accent',
-        ':theme mono       use grayscale terminal accent',
-        ':compact on       hide some page chrome and tighten spacing',
-        ':compact off      restore roomier spacing',
-        ':unread           try opening the first unread-looking thread',
-        ':reload           reload Facebook Messages',
+        ':focus search     focus messenger search',
+        ':theme green|amber|cyan|mono',
+        ':compact on|off   tighten / restore spacing',
+        ':unread           open first unread-looking thread',
+        ':reload           reload',
         '',
-        'Shortcuts: Ctrl/Cmd+Shift+P opens this palette. Ctrl/Cmd+Shift+T cycles theme.'
+        'shortcuts: ctrl/cmd+shift+p palette · ctrl/cmd+shift+t cycle theme'
       ].join('\n');
     }
 
@@ -263,7 +330,18 @@
     }, true);
   }
 
-  const observer = new MutationObserver(() => apply());
+  let applyScheduled = false;
+  function scheduleApply() {
+    if (applyScheduled) return;
+    applyScheduled = true;
+    requestAnimationFrame(() => {
+      applyScheduled = false;
+      apply();
+    });
+  }
+
+  const observer = new MutationObserver(scheduleApply);
+
   function start() {
     apply();
     bindKeyboard();
@@ -274,7 +352,7 @@
   }
 
   window.TerminalMessenger = {
-    version: '0.1.0',
+    version: '0.2.0',
     apply,
     openPalette,
     closePalette,
