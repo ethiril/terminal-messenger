@@ -1,12 +1,17 @@
+/* ─── theme palette (defined on :root so overlays outside <body> resolve too) ─── */
 :root {
   --tm-bg: #050805;
   --tm-text: #c8e8c0;
   --tm-muted: #5a8a5a;
   --tm-accent: #70ff7b;
   --tm-dim: #1a3a1a;
+  --tm-font-stack: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  --tm-font-size: 12px;
+  --tm-line-height: 1.35;
+  --tm-statusline-height: 18px;
 }
 
-body.tm-theme-amber {
+html.tm-theme-amber {
   --tm-bg: #0a0700;
   --tm-text: #f5d99a;
   --tm-muted: #a07a30;
@@ -14,7 +19,7 @@ body.tm-theme-amber {
   --tm-dim: #3a2a08;
 }
 
-body.tm-theme-cyan {
+html.tm-theme-cyan {
   --tm-bg: #02080d;
   --tm-text: #c0e8f5;
   --tm-muted: #5a90a8;
@@ -22,7 +27,7 @@ body.tm-theme-cyan {
   --tm-dim: #0a2530;
 }
 
-body.tm-theme-mono {
+html.tm-theme-mono {
   --tm-bg: #080808;
   --tm-text: #d8d8d8;
   --tm-muted: #777777;
@@ -30,12 +35,28 @@ body.tm-theme-mono {
   --tm-dim: #222222;
 }
 
-/* ───────────── flatten and monospace everything ───────────── */
+/* ─── early paint: keep the page black until terminal.js attaches ─── */
+html.tm-terminal-theme {
+  background: var(--tm-bg) !important;
+  color: var(--tm-text) !important;
+}
+
+html.tm-terminal-theme body {
+  background: var(--tm-bg) !important;
+  color: var(--tm-text) !important;
+  visibility: hidden;
+}
+
+html.tm-terminal-theme.tm-ready body {
+  visibility: visible;
+}
+
+/* ─── flatten and monospace everything inside body ─── */
 body.tm-terminal-theme,
 body.tm-terminal-theme *,
 body.tm-terminal-theme *::before,
 body.tm-terminal-theme *::after {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace !important;
+  font-family: var(--tm-font-stack) !important;
   font-weight: normal !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -47,8 +68,6 @@ body.tm-terminal-theme *::after {
 }
 
 body.tm-terminal-theme {
-  background: var(--tm-bg) !important;
-  color: var(--tm-text) !important;
   --web-wash: var(--tm-bg) !important;
   --surface-background: var(--tm-bg) !important;
   --card-background: var(--tm-bg) !important;
@@ -64,9 +83,10 @@ body.tm-terminal-theme {
   --divider: var(--tm-dim) !important;
   scrollbar-color: var(--tm-dim) var(--tm-bg) !important;
   scrollbar-width: thin !important;
+  padding-top: var(--tm-statusline-height) !important;
 }
 
-/* ───────────── kill backgrounds and borders everywhere ───────────── */
+/* ─── strip backgrounds and borders site-wide ─── */
 body.tm-terminal-theme div,
 body.tm-terminal-theme span,
 body.tm-terminal-theme section,
@@ -101,8 +121,8 @@ body.tm-terminal-theme h4,
 body.tm-terminal-theme strong,
 body.tm-terminal-theme b {
   color: var(--tm-text) !important;
-  font-size: 13px !important;
-  line-height: 1.4 !important;
+  font-size: var(--tm-font-size) !important;
+  line-height: var(--tm-line-height) !important;
 }
 
 body.tm-terminal-theme a,
@@ -112,7 +132,7 @@ body.tm-terminal-theme [role='link'] * {
   text-decoration: none !important;
 }
 
-/* ───────────── strip imagery outside the message log ───────────── */
+/* ─── strip imagery outside the active conversation ─── */
 body.tm-terminal-theme img,
 body.tm-terminal-theme svg,
 body.tm-terminal-theme video,
@@ -123,7 +143,6 @@ body.tm-terminal-theme [data-visualcompletion='ignore-dynamic'] {
   display: none !important;
 }
 
-/* re-enable media inside the active conversation thread only */
 body.tm-terminal-theme [role='log'] img,
 body.tm-terminal-theme [role='log'] video,
 body.tm-terminal-theme [role='log'] canvas,
@@ -136,11 +155,11 @@ body.tm-terminal-theme [data-tm-thread] canvas {
   display: revert !important;
   border-radius: 0 !important;
   border: 1px solid var(--tm-dim) !important;
-  max-width: 320px !important;
-  max-height: 240px !important;
+  max-width: 280px !important;
+  max-height: 200px !important;
 }
 
-/* ───────────── hide the entire facebook chrome ───────────── */
+/* ─── hide facebook chrome ─── */
 body.tm-terminal-theme [role='banner'],
 body.tm-terminal-theme [aria-label='Stories'],
 body.tm-terminal-theme [aria-label='Watch'],
@@ -158,20 +177,27 @@ body.tm-terminal-theme [data-pagelet='Stories'] {
   display: none !important;
 }
 
-/* keep main and the messenger panel; collapse padding aggressively */
 body.tm-terminal-theme [role='main'] {
   padding: 0 !important;
   gap: 0 !important;
 }
 
-/* ───────────── tighten chat list rows ───────────── */
+/* ─── tighten chat list rows ─── */
 body.tm-terminal-theme [role='row'],
 body.tm-terminal-theme [role='gridcell'],
 body.tm-terminal-theme [role='listitem'] {
-  padding: 1px 6px !important;
+  padding: 0 6px !important;
   margin: 0 !important;
   min-height: unset !important;
   height: auto !important;
+}
+
+body.tm-terminal-theme.tm-compact [role='row'],
+body.tm-terminal-theme.tm-compact [role='gridcell'],
+body.tm-terminal-theme.tm-compact [role='listitem'] {
+  padding: 0 4px !important;
+  font-size: 11px !important;
+  line-height: 1.25 !important;
 }
 
 body.tm-terminal-theme [role='row']:hover,
@@ -190,7 +216,7 @@ body.tm-terminal-theme [role='tab'][aria-selected='true'] {
   padding-left: 4px !important;
 }
 
-/* ───────────── strip message bubble decorations ───────────── */
+/* ─── flatten message bubbles into log lines ─── */
 body.tm-terminal-theme [role='log'] *,
 body.tm-terminal-theme [aria-label*='Messages in conversation'] *,
 body.tm-terminal-theme [data-tm-thread] * {
@@ -198,14 +224,13 @@ body.tm-terminal-theme [data-tm-thread] * {
   border-color: transparent !important;
 }
 
-/* keep bubble text aligned as plain log lines */
 body.tm-terminal-theme [role='log'] [role='row'],
 body.tm-terminal-theme [aria-label*='Messages in conversation'] [role='row'] {
   padding: 1px 8px !important;
   display: block !important;
 }
 
-/* ───────────── inputs ───────────── */
+/* ─── inputs ─── */
 body.tm-terminal-theme input,
 body.tm-terminal-theme textarea,
 body.tm-terminal-theme [contenteditable='true'],
@@ -217,8 +242,8 @@ body.tm-terminal-theme [role='textbox'] {
   outline: none !important;
   caret-color: var(--tm-accent) !important;
   box-shadow: none !important;
-  padding: 4px 6px !important;
-  font-size: 13px !important;
+  padding: 3px 6px !important;
+  font-size: var(--tm-font-size) !important;
 }
 
 body.tm-terminal-theme input:focus,
@@ -229,7 +254,6 @@ body.tm-terminal-theme [role='textbox']:focus {
   box-shadow: none !important;
 }
 
-/* allow paste on password / text inputs even if site tries to disable it */
 body.tm-terminal-theme input[type='password'],
 body.tm-terminal-theme input[type='text'],
 body.tm-terminal-theme input[type='email'] {
@@ -237,10 +261,10 @@ body.tm-terminal-theme input[type='email'] {
   user-select: text !important;
 }
 
-/* ───────────── scrollbars ───────────── */
+/* ─── scrollbars ─── */
 body.tm-terminal-theme *::-webkit-scrollbar {
-  width: 6px !important;
-  height: 6px !important;
+  width: 5px !important;
+  height: 5px !important;
 }
 body.tm-terminal-theme *::-webkit-scrollbar-track {
   background: var(--tm-bg) !important;
@@ -253,62 +277,96 @@ body.tm-terminal-theme *::-webkit-scrollbar-thumb:hover {
   background: var(--tm-muted) !important;
 }
 
-/* ───────────── command palette ───────────── */
+/* ─── status line (zsh-style prompt fixed at top) ─── */
+#tm-statusline {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--tm-statusline-height);
+  z-index: 2147483646;
+  background: var(--tm-bg) !important;
+  color: var(--tm-muted) !important;
+  border-bottom: 1px solid var(--tm-dim);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  font-family: var(--tm-font-stack);
+  font-size: 10px;
+  pointer-events: none;
+  user-select: none;
+}
+
+#tm-statusline .tm-prompt-arrow {
+  color: var(--tm-accent) !important;
+}
+
+#tm-statusline .tm-prompt-path {
+  color: var(--tm-text) !important;
+}
+
+#tm-statusline .tm-prompt-clock {
+  color: var(--tm-muted) !important;
+  margin-left: auto;
+}
+
+#tm-statusline .tm-prompt-hint {
+  color: var(--tm-muted) !important;
+  opacity: 0.8;
+}
+
+/* ─── command palette (must visually cover content underneath) ─── */
 #tm-command-root {
   position: fixed;
   inset: 0;
   z-index: 2147483647;
   pointer-events: none;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  display: none;
+  font-family: var(--tm-font-stack);
 }
 
 #tm-command-root.tm-command-open {
+  display: block;
   pointer-events: auto;
 }
 
 #tm-command-root .tm-command-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  opacity: 0;
-}
-
-#tm-command-root.tm-command-open .tm-command-backdrop {
-  opacity: 1;
+  background: rgba(0, 0, 0, 0.92) !important;
 }
 
 #tm-command-root .tm-command-panel {
   position: absolute;
   left: 50%;
-  top: 18vh;
-  width: min(720px, calc(100vw - 32px));
+  top: 14vh;
   transform: translateX(-50%);
-  opacity: 0;
-  background: var(--tm-bg);
-  color: var(--tm-text);
+  width: min(680px, calc(100vw - 24px));
+  background: var(--tm-bg) !important;
+  color: var(--tm-text) !important;
   border: 1px solid var(--tm-dim);
-  padding: 10px 12px;
-}
-
-#tm-command-root.tm-command-open .tm-command-panel {
-  opacity: 1;
+  padding: 8px 10px;
+  /* belt-and-suspenders: even if the body reset wins specificity, force opacity */
+  opacity: 1 !important;
 }
 
 #tm-command-root .tm-command-title {
-  color: var(--tm-muted);
-  font-size: 12px;
-  margin-bottom: 6px;
+  color: var(--tm-muted) !important;
+  font-size: 11px;
+  margin-bottom: 4px;
 }
 
 #tm-command-root .tm-command-input {
   width: 100%;
   box-sizing: border-box;
-  background: transparent;
-  color: var(--tm-text);
+  background: transparent !important;
+  color: var(--tm-text) !important;
   border: none;
   border-bottom: 1px solid var(--tm-dim);
-  padding: 6px 0;
-  font-size: 14px;
+  padding: 4px 0;
+  font-size: 13px;
+  font-family: var(--tm-font-stack);
   outline: none;
   caret-color: var(--tm-accent);
 }
@@ -318,79 +376,42 @@ body.tm-terminal-theme *::-webkit-scrollbar-thumb:hover {
 }
 
 #tm-command-root .tm-command-hint {
-  color: var(--tm-muted);
-  font-size: 11px;
-  margin: 8px 0;
+  color: var(--tm-muted) !important;
+  font-size: 10px;
+  margin: 6px 0;
 }
 
 #tm-command-root .tm-command-output {
-  min-height: 60px;
-  max-height: 280px;
+  min-height: 48px;
+  max-height: 240px;
   overflow: auto;
   margin: 0;
-  padding: 8px 0 0 0;
-  color: var(--tm-text);
-  background: transparent;
+  padding: 6px 0 0 0;
+  color: var(--tm-text) !important;
+  background: transparent !important;
   border: none;
   border-top: 1px dashed var(--tm-dim);
   white-space: pre-wrap;
-  font-size: 12px;
+  font-size: 11px;
+  font-family: var(--tm-font-stack);
 }
 
-/* ───────────── toast ───────────── */
+/* ─── toast ─── */
 #tm-toast {
   position: fixed;
-  right: 12px;
-  bottom: 12px;
+  right: 8px;
+  bottom: 8px;
   z-index: 2147483647;
-  background: var(--tm-bg);
-  color: var(--tm-accent);
+  background: var(--tm-bg) !important;
+  color: var(--tm-accent) !important;
   border: 1px solid var(--tm-dim);
-  padding: 4px 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
-  font-size: 12px;
+  padding: 3px 7px;
+  font-family: var(--tm-font-stack);
+  font-size: 11px;
   opacity: 0;
   pointer-events: none;
 }
 
 #tm-toast.tm-toast-visible {
   opacity: 1;
-}
-
-/* ───────────── status line (zsh-style prompt at top) ───────────── */
-#tm-statusline {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 22px;
-  z-index: 2147483646;
-  background: var(--tm-bg);
-  color: var(--tm-muted);
-  border-bottom: 1px solid var(--tm-dim);
-  display: flex;
-  align-items: center;
-  padding: 0 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
-  font-size: 11px;
-  pointer-events: none;
-  user-select: none;
-}
-
-#tm-statusline .tm-prompt-arrow {
-  color: var(--tm-accent);
-  margin-right: 6px;
-}
-
-#tm-statusline .tm-prompt-path {
-  color: var(--tm-text);
-}
-
-#tm-statusline .tm-prompt-hint {
-  margin-left: auto;
-  color: var(--tm-muted);
-}
-
-body.tm-terminal-theme {
-  padding-top: 22px !important;
 }

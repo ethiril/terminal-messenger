@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "start": "electron .",
-    "check": "node --check src/main.js && node --check src/inject/terminal.js",
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/inject/terminal.js",
     "clean-profile": "node scripts/clean-profile.js",
     "dist": "electron-builder --mac",
     "pack": "electron-builder --mac --dir"
