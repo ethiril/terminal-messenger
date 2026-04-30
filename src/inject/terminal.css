@@ -352,24 +352,36 @@ body.tm-terminal-theme [role='log'] img[data-tm-img-size='small'] {
   opacity: 0.6 !important;
 }
 
-/* drop chat-list avatars entirely so each row reads as just "Name / preview
-   · timestamp". hide every imagery type fb might use for the avatar plus the
-   square-aspect-ratio wrapper (--x-paddingTop:100%) and the marker fb stamps
-   on dynamic-loaded thumbnails (data-visualcompletion="ignore-dynamic") so
-   no blank column is reserved where the picture used to sit. */
-body.tm-terminal-theme [data-tm-chat-list] [role='row'] img,
-body.tm-terminal-theme [data-tm-chat-list] [role='row'] picture,
-body.tm-terminal-theme [data-tm-chat-list] [role='row'] svg,
-body.tm-terminal-theme [data-tm-chat-list] [role='row'] i[data-visualcompletion='css-img'],
+/* drop chat-list avatars so each row reads as just "Name / preview · time".
+   target only the avatar's specific wrappers - the square-aspect-ratio
+   container fb stamps with --x-paddingTop:100% and the dynamic-load marker
+   data-visualcompletion="ignore-dynamic" - so we don't sweep up reaction
+   emojis or other inline imagery embedded in the preview text (e.g. the
+   small heart that appears with "Reacted ❤ to your message"). */
 body.tm-terminal-theme [data-tm-chat-list] [role='row'] [data-visualcompletion='ignore-dynamic'],
 body.tm-terminal-theme [data-tm-chat-list] [role='row'] [style*='--x-paddingTop'],
-body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] img,
-body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] picture,
-body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] svg,
-body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] i[data-visualcompletion='css-img'],
 body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] [data-visualcompletion='ignore-dynamic'],
 body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] [style*='--x-paddingTop'] {
   display: none !important;
+}
+
+/* keep inline preview imagery (reactions, sticker thumbs, gif icons) at a
+   tight size so they sit on the text baseline instead of growing the row */
+body.tm-terminal-theme [data-tm-chat-list] [role='row'] img,
+body.tm-terminal-theme [data-tm-chat-list] [role='row'] picture,
+body.tm-terminal-theme [data-tm-chat-list] [role='row'] i[data-visualcompletion='css-img'],
+body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] img,
+body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] picture,
+body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] i[data-visualcompletion='css-img'] {
+  width: 14px !important;
+  height: 14px !important;
+  max-width: 14px !important;
+  max-height: 14px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  object-fit: contain !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
 }
 
 /* fb wraps avatars in an <svg> with a circular <mask>; the global svg crush
@@ -755,10 +767,52 @@ body.tm-terminal-theme [aria-roledescription='message'] [role='toolbar'][aria-la
 /* the toolbar slot is the trailing sibling of the bubble in DOM order, so
    it naturally sits to the right of the bubble in flex flow. for outgoing
    messages we want it on the LEFT of the bubble (in the empty leading
-   space), so flip it to the front of the flex order. incoming keeps the
-   default order so it lands on the bubble's right side. */
-body.tm-terminal-theme [aria-roledescription='message'][data-tm-direction='out'] > [role='presentation']:has([role='toolbar']) > [role='presentation']:has([role='toolbar']) {
-  order: -1 !important;
+   space), so flip the WHOLE bubble row to row-reverse - cleaner than
+   per-child order shuffling because image bubbles sometimes carry their
+   own internal [role='toolbar'] (media controls), which made our previous
+   :has([role='toolbar']) child selector match both the bubble and the
+   message-actions slot, ties on order:-1, and falls back to DOM order. */
+body.tm-terminal-theme [aria-roledescription='message'][data-tm-direction='out'] > [role='presentation']:has(> [role='presentation'] [role='toolbar'][aria-label='Message actions' i]) {
+  flex-direction: row-reverse !important;
+}
+
+/* fb's text bubble wraps the text in span / presentation / div layers that
+   set display:-webkit-box + -webkit-line-clamp + overflow:hidden for
+   line-clamped truncation. on a single-line message that reserves multiple
+   line boxes, anchors text to the top of the box, and clips ascenders.
+   the clip lives somewhere up the chain from [dir="auto"], so apply the
+   unwind to every ancestor that has a [dir="auto"] descendant - safe
+   because :has() filters out the toolbar branch (no [dir="auto"] under
+   action buttons). */
+body.tm-terminal-theme [aria-roledescription='message'] *:has(div[dir='auto']) {
+  -webkit-line-clamp: unset !important;
+  -webkit-box-orient: unset !important;
+  overflow: visible !important;
+  max-height: none !important;
+}
+
+body.tm-terminal-theme [aria-roledescription='message'] span:has(> div[dir='auto']),
+body.tm-terminal-theme [aria-roledescription='message'] [role='presentation']:has(> span > div[dir='auto']) {
+  display: block !important;
+}
+
+/* extra breathing room between messages - regular messenger pads ~6-8px
+   between consecutive messages, our tight terminal layout collapsed that
+   down to ~2px and made the log feel like an undifferentiated wall of
+   text. add margin to each message wrapper so adjacent rows are visually
+   separated without growing the row's internal height. */
+body.tm-terminal-theme [role='log'] [aria-roledescription='message'],
+body.tm-terminal-theme [data-tm-thread] [aria-roledescription='message'] {
+  margin-top: 4px !important;
+  margin-bottom: 4px !important;
+}
+
+/* and a touch more between consecutive messages from different senders
+   (fb leaves the empty <h3> sender-header on the first message of a run;
+   :has() selects rows where that header has visible text content) */
+body.tm-terminal-theme [role='log'] [aria-roledescription='message']:has(h3:not(:empty)),
+body.tm-terminal-theme [data-tm-thread] [aria-roledescription='message']:has(h3:not(:empty)) {
+  margin-top: 12px !important;
 }
 
 /* tagged in JS via [data-tm-action-button] - matching in CSS via aria-label

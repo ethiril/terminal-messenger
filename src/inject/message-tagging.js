@@ -1,18 +1,44 @@
 function inferMessageDirection(messageRow) {
   const ariaLabel = messageRow.getAttribute('aria-label') ?? '';
-  /* fb formats outgoing aria-labels as "At <time>, You: <text>" or "You sent
-     a <thing>" - both forms include the standalone token "You" followed by
-     a colon or " sent ". incoming labels lead with the sender's name. */
-  if (/\byou sent\b|\byou said\b|\bYou:\s|\boutgoing\b/i.test(ariaLabel)) return 'out';
+  /* fb formats outgoing aria-labels in several variants depending on type:
+     "At <time>, You: <text>" (text message), "You sent a <thing>" (media),
+     "Enter, Message sent <time> by You: <text>" (button-style activator).
+     incoming labels lead with the sender's name. catch all the "You" forms
+     including "by You" so text messages don't fall through to position
+     detection (where they sometimes get misclassified). */
+  if (/\byou sent\b|\byou said\b|\bYou:\s|\bby You\b|\boutgoing\b/i.test(ariaLabel)) return 'out';
+
+  /* fb sometimes hangs the outgoing-direction signal off a descendant
+     (the bubble's clickable wrapper carries an aria-label like
+     "Enter, Message sent <time> by You: ..."). check those before falling
+     back to geometry. */
+  const ownedYouLabel = messageRow.querySelector(
+    '[aria-label*="by You" i], [aria-label*="You sent" i], [aria-label*=" You:" i]'
+  );
+  if (ownedYouLabel) return 'out';
 
   const rowRect = messageRow.getBoundingClientRect();
   if (rowRect.width === 0) return null;
 
-  const bubbleElement = messageRow.querySelector(':scope > div, :scope > [role="gridcell"]');
-  if (!bubbleElement) return null;
-
-  const bubbleRect = bubbleElement.getBoundingClientRect();
-  if (bubbleRect.width === 0) return null;
+  /* :scope > div used to be the bubble in older layouts, but in this build
+     the first child is a header/h3 that spans the full row and would always
+     classify as "centered" (i.e. incoming). prefer a presentation element
+     narrower than 90% of the row - that's the actual bubble. */
+  let bubbleRect = null;
+  const candidates = messageRow.querySelectorAll(':scope [role="presentation"]');
+  for (const candidate of candidates) {
+    const rect = candidate.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) continue;
+    if (rect.width >= rowRect.width * 0.9) continue;
+    bubbleRect = rect;
+    break;
+  }
+  if (!bubbleRect) {
+    const fallback = messageRow.querySelector(':scope > div, :scope > [role="gridcell"]');
+    if (!fallback) return null;
+    bubbleRect = fallback.getBoundingClientRect();
+    if (bubbleRect.width === 0) return null;
+  }
 
   const rowCenter = rowRect.left + rowRect.width / 2;
   const bubbleCenter = bubbleRect.left + bubbleRect.width / 2;

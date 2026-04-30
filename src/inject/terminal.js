@@ -64,12 +64,32 @@ function startMutationObserver() {
   new MutationObserver(scheduleApply).observe(document.body, { childList: true, subtree: true });
 }
 
+/* fb keeps DOM focus on a message bubble after the user clicks reply, and
+   when the window later blurs/refocuses (or fb re-renders), the browser
+   auto-scrolls the focused element into view - so the chat snaps back to
+   the old message even though the user has moved on. blur message focus
+   on every window blur so the next focus event has nothing to scroll to.
+   inputs/contenteditables (composer + search) keep their focus normally. */
+function bindMessageFocusReleaser() {
+  function releaseLingeringMessageFocus() {
+    const active = document.activeElement;
+    if (!active || active === document.body) return;
+    if (active.matches('input, textarea, [contenteditable="true"], [role="textbox"]')) return;
+    if (active.closest('[aria-roledescription="message"], [role="article"]')) {
+      active.blur();
+    }
+  }
+  window.addEventListener('blur', releaseLingeringMessageFocus, true);
+  window.addEventListener('focus', releaseLingeringMessageFocus, true);
+}
+
 function start() {
   applyDocumentTheme();
   applyWindowOpacity(settings.opacityPct);
   applyWindowMuted(settings.muted);
   bindKeyboardShortcuts();
   bindMediaViewerEvents();
+  bindMessageFocusReleaser();
   startMutationObserver();
   startStatuslineClock();
 }
