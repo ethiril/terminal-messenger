@@ -102,6 +102,8 @@ function shortcutHandlerFor(input) {
   if (isPrimaryModifier && isShift && pressedKey === 'i') return (win) => win.webContents.toggleDevTools();
   if (isPrimaryModifier && isShift && pressedKey === 't') return (win) => runRendererAction(win, 'toggleTheme');
   if (isPrimaryModifier && isShift && pressedKey === 'p') return (win) => runRendererAction(win, 'openPalette');
+  if (isPrimaryModifier && isShift && pressedKey === 'u') return (win) => runRendererAction(win, 'toggleUltra');
+  if (isPrimaryModifier && isShift && pressedKey === 's') return (win) => runRendererAction(win, 'openSearchOverlay');
   if (isAlt && pressedKey === 'left') return (win) => { if (win.webContents.canGoBack()) win.webContents.goBack(); };
   if (isAlt && pressedKey === 'right') return (win) => { if (win.webContents.canGoForward()) win.webContents.goForward(); };
 
@@ -146,6 +148,13 @@ function createMessengerWindow() {
     if (isAllowedMessengerUrl(url)) return;
     event.preventDefault();
     shell.openExternal(url);
+  });
+
+  messengerWindow.on('page-title-updated', (event, updatedTitle) => {
+    event.preventDefault();
+    const unreadMatch = updatedTitle?.match(/\((\d+)\)/);
+    const unreadSuffix = unreadMatch ? ` (${unreadMatch[1]})` : '';
+    messengerWindow.setTitle(`Terminal Messenger${unreadSuffix}`);
   });
 
   messengerWindow.webContents.on('dom-ready', async () => {
@@ -205,6 +214,16 @@ function buildApplicationMenu() {
           label: 'Toggle Theme',
           accelerator: 'CmdOrCtrl+Shift+T',
           click: (_menuItem, focusedWindow) => runRendererAction(focusedWindow, 'toggleTheme')
+        },
+        {
+          label: 'Toggle Ultra Terminal Mode',
+          accelerator: 'CmdOrCtrl+Shift+U',
+          click: (_menuItem, focusedWindow) => runRendererAction(focusedWindow, 'toggleUltra')
+        },
+        {
+          label: 'Search Chats',
+          accelerator: 'CmdOrCtrl+Shift+S',
+          click: (_menuItem, focusedWindow) => runRendererAction(focusedWindow, 'openSearchOverlay')
         },
         { type: 'separator' },
         { role: 'reload' },

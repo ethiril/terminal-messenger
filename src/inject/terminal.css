@@ -39,12 +39,18 @@ html.tm-theme-mono {
 html.tm-terminal-theme {
   background: var(--tm-bg) !important;
   color: var(--tm-text) !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
 }
 
 html.tm-terminal-theme body {
   background: var(--tm-bg) !important;
   color: var(--tm-text) !important;
   visibility: hidden;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
 }
 
 html.tm-terminal-theme.tm-ready body {
@@ -102,12 +108,53 @@ body.tm-terminal-theme [role='row'],
 body.tm-terminal-theme [role='gridcell'],
 body.tm-terminal-theme [role='button'],
 body.tm-terminal-theme [role='link'],
-body.tm-terminal-theme [role='menu'],
-body.tm-terminal-theme [role='menuitem'],
-body.tm-terminal-theme [role='dialog'],
 body.tm-terminal-theme [role='tabpanel'] {
   background-color: transparent !important;
   border-color: var(--tm-dim) !important;
+}
+
+/* ─── overlays must stay opaque so underlying chat list does not bleed through ─── */
+body.tm-terminal-theme [role='dialog'],
+body.tm-terminal-theme [role='menu'],
+body.tm-terminal-theme [role='listbox'],
+body.tm-terminal-theme [role='tooltip'],
+body.tm-terminal-theme [role='alertdialog'],
+body.tm-terminal-theme [aria-modal='true'] {
+  background: var(--tm-bg) !important;
+  border: 1px solid var(--tm-dim) !important;
+}
+
+body.tm-terminal-theme [role='menu'] *,
+body.tm-terminal-theme [role='listbox'] *,
+body.tm-terminal-theme [role='dialog'] *,
+body.tm-terminal-theme [role='tooltip'] *,
+body.tm-terminal-theme [aria-modal='true'] * {
+  background-color: transparent !important;
+}
+
+/* dialogs (especially the photo lightbox) rely on natural flex sizing -
+   the global div crush collapses children to 0 dims and breaks the layout. */
+body.tm-terminal-theme [role='dialog'] *,
+body.tm-terminal-theme [aria-modal='true'] * {
+  min-height: revert !important;
+  padding-top: revert !important;
+  margin-top: revert !important;
+}
+
+body.tm-terminal-theme [role='dialog'] img,
+body.tm-terminal-theme [role='dialog'] picture,
+body.tm-terminal-theme [role='dialog'] video,
+body.tm-terminal-theme [aria-modal='true'] img,
+body.tm-terminal-theme [aria-modal='true'] picture,
+body.tm-terminal-theme [aria-modal='true'] video {
+  display: revert !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+body.tm-terminal-theme [role='menuitem']:hover,
+body.tm-terminal-theme [role='option']:hover {
+  background: var(--tm-dim) !important;
 }
 
 body.tm-terminal-theme a,
@@ -132,31 +179,105 @@ body.tm-terminal-theme [role='link'] * {
   text-decoration: none !important;
 }
 
-/* ─── strip imagery outside the active conversation ─── */
-body.tm-terminal-theme img,
-body.tm-terminal-theme svg,
-body.tm-terminal-theme video,
-body.tm-terminal-theme canvas,
-body.tm-terminal-theme i[data-visualcompletion='css-img'],
-body.tm-terminal-theme [role='img'],
-body.tm-terminal-theme [data-visualcompletion='ignore-dynamic'] {
+/* ─── imagery rules ───
+   default: <img>, video, canvas are visible (lightbox, reactions, paste preview need them).
+   we only hide imagery in the chat list / contact rail, plus pure CSS-decoration <i> tags.
+   <svg> icons render as small monochrome glyphs.
+*/
+body.tm-terminal-theme i[data-visualcompletion='css-img'] {
   display: none !important;
 }
 
-body.tm-terminal-theme [role='log'] img,
+body.tm-terminal-theme [role='complementary'] img,
+body.tm-terminal-theme [role='complementary'] picture,
+body.tm-terminal-theme [role='complementary'] video,
+body.tm-terminal-theme [role='complementary'] canvas,
+body.tm-terminal-theme [role='complementary'] [role='img'],
+body.tm-terminal-theme [role='complementary'] svg[role='img'],
+body.tm-terminal-theme [role='complementary'] [aria-label*='profile' i],
+body.tm-terminal-theme [role='complementary'] [aria-label*='Profile picture'],
+body.tm-terminal-theme [role='complementary'] [data-visualcompletion='css-img'],
+body.tm-terminal-theme aside img,
+body.tm-terminal-theme aside picture,
+body.tm-terminal-theme aside [role='img'] {
+  display: none !important;
+}
+
+/* allow background-image inside dialogs, popovers and the message log
+   (emoji pickers, sticker pickers, custom emoji, reaction trays use it) */
+body.tm-terminal-theme [role='dialog'] *,
+body.tm-terminal-theme [aria-modal='true'] *,
+body.tm-terminal-theme [role='menu'] *,
+body.tm-terminal-theme [role='listbox'] *,
+body.tm-terminal-theme [role='log'] *,
+body.tm-terminal-theme [data-tm-thread] * {
+  background-image: revert !important;
+}
+
+body.tm-terminal-theme svg,
+body.tm-terminal-theme svg * {
+  fill: var(--tm-muted) !important;
+  stroke: var(--tm-muted) !important;
+  color: var(--tm-muted) !important;
+}
+
+body.tm-terminal-theme svg {
+  width: 14px !important;
+  height: 14px !important;
+  max-width: 14px !important;
+  max-height: 14px !important;
+  opacity: 0.85 !important;
+}
+
+body.tm-terminal-theme [role='button']:hover svg,
+body.tm-terminal-theme [role='button']:hover svg *,
+body.tm-terminal-theme [role='link']:hover svg,
+body.tm-terminal-theme [role='link']:hover svg *,
+body.tm-terminal-theme button:hover svg,
+body.tm-terminal-theme button:hover svg *,
+body.tm-terminal-theme [aria-selected='true'] svg,
+body.tm-terminal-theme [aria-selected='true'] svg *,
+body.tm-terminal-theme [aria-current='page'] svg,
+body.tm-terminal-theme [aria-current='page'] svg *,
+body.tm-terminal-theme [aria-pressed='true'] svg,
+body.tm-terminal-theme [aria-pressed='true'] svg * {
+  fill: var(--tm-accent) !important;
+  stroke: var(--tm-accent) !important;
+  color: var(--tm-accent) !important;
+  opacity: 1 !important;
+}
+
+/* cap inline media in the message log */
+body.tm-terminal-theme [role='log'] img:not([data-tm-img-size='small']),
+body.tm-terminal-theme [data-tm-thread] img:not([data-tm-img-size='small']),
 body.tm-terminal-theme [role='log'] video,
 body.tm-terminal-theme [role='log'] canvas,
-body.tm-terminal-theme [aria-label*='Messages in conversation'] img,
-body.tm-terminal-theme [aria-label*='Messages in conversation'] video,
-body.tm-terminal-theme [aria-label*='Messages in conversation'] canvas,
-body.tm-terminal-theme [data-tm-thread] img,
 body.tm-terminal-theme [data-tm-thread] video,
 body.tm-terminal-theme [data-tm-thread] canvas {
-  display: revert !important;
   border-radius: 0 !important;
   border: 1px solid var(--tm-dim) !important;
   max-width: 280px !important;
   max-height: 200px !important;
+}
+
+/* hide chat-log avatars (small imgs tagged by JS) */
+body.tm-terminal-theme [role='log'] img[data-tm-img-size='small'] {
+  display: none !important;
+}
+
+/* image lightbox: full size */
+body.tm-terminal-theme [role='dialog'] img,
+body.tm-terminal-theme [aria-modal='true'] img {
+  max-width: 90vw !important;
+  max-height: 80vh !important;
+}
+
+body.tm-terminal-theme [role='log'] svg,
+body.tm-terminal-theme [data-tm-thread] svg {
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
 }
 
 /* ─── hide facebook chrome ─── */
@@ -182,6 +303,56 @@ body.tm-terminal-theme [role='main'] {
   gap: 0 !important;
 }
 
+/* ─── collapse dead vertical space left behind by hidden facebook chrome ───
+   universal crush of div/section padding-top + margin-top. body padding-top
+   is restored below so the statusline still has its 18px reserved strip. */
+body.tm-terminal-theme div,
+body.tm-terminal-theme section,
+body.tm-terminal-theme main,
+body.tm-terminal-theme aside,
+body.tm-terminal-theme header,
+body.tm-terminal-theme footer,
+body.tm-terminal-theme nav {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+  min-height: 0 !important;
+}
+
+body.tm-terminal-theme [role='main'] [role='heading'] {
+  padding: 2px 6px !important;
+  margin: 0 !important;
+  min-height: unset !important;
+  font-size: 12px !important;
+}
+
+/* ─── make sure leftover left-rail slivers are gone ─── */
+body.tm-terminal-theme [role='navigation'][aria-label='Shortcuts'],
+body.tm-terminal-theme [role='navigation'][aria-label*='Main'],
+body.tm-terminal-theme [data-pagelet='LeftRail'] *,
+body.tm-terminal-theme [data-pagelet='Stories'] *,
+body.tm-terminal-theme [data-pagelet='RightRail'] {
+  display: none !important;
+}
+
+/* ─── tab strip (All / Unread / Groups / Communities) stays on one line ─── */
+body.tm-terminal-theme [role='tablist'] {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+
+body.tm-terminal-theme [role='tablist']::-webkit-scrollbar {
+  display: none !important;
+}
+
+body.tm-terminal-theme [role='tab'] {
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  padding: 2px 8px !important;
+  font-size: 11px !important;
+}
+
 /* ─── tighten chat list rows ─── */
 body.tm-terminal-theme [role='row'],
 body.tm-terminal-theme [role='gridcell'],
@@ -190,6 +361,21 @@ body.tm-terminal-theme [role='listitem'] {
   margin: 0 !important;
   min-height: unset !important;
   height: auto !important;
+  line-height: 1.25 !important;
+}
+
+/* crush descendant padding/margin in side panels (chat list, contacts).
+   the message log overrides this further down so its bubbles still breathe. */
+body.tm-terminal-theme [role='complementary'] [role='row'] *,
+body.tm-terminal-theme [role='complementary'] [role='listitem'] *,
+body.tm-terminal-theme [role='complementary'] [role='gridcell'] *,
+body.tm-terminal-theme [role='grid']:not([role='log']) [role='row'] *,
+body.tm-terminal-theme [role='grid']:not([role='log']) [role='gridcell'] * {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 1px !important;
+  padding-bottom: 1px !important;
+  min-height: unset !important;
 }
 
 body.tm-terminal-theme.tm-compact [role='row'],
@@ -197,7 +383,7 @@ body.tm-terminal-theme.tm-compact [role='gridcell'],
 body.tm-terminal-theme.tm-compact [role='listitem'] {
   padding: 0 4px !important;
   font-size: 11px !important;
-  line-height: 1.25 !important;
+  line-height: 1.2 !important;
 }
 
 body.tm-terminal-theme [role='row']:hover,
@@ -216,6 +402,15 @@ body.tm-terminal-theme [role='tab'][aria-selected='true'] {
   padding-left: 4px !important;
 }
 
+/* selected-state highlight should not bleed into individual messages or hover the log */
+body.tm-terminal-theme [role='log'] [aria-selected='true'],
+body.tm-terminal-theme [role='log']:hover,
+body.tm-terminal-theme [role='log'] [role='row']:hover {
+  background: transparent !important;
+  border-left: none !important;
+  padding-left: 0 !important;
+}
+
 /* ─── flatten message bubbles into log lines ─── */
 body.tm-terminal-theme [role='log'] *,
 body.tm-terminal-theme [aria-label*='Messages in conversation'] *,
@@ -226,8 +421,16 @@ body.tm-terminal-theme [data-tm-thread] * {
 
 body.tm-terminal-theme [role='log'] [role='row'],
 body.tm-terminal-theme [aria-label*='Messages in conversation'] [role='row'] {
-  padding: 1px 8px !important;
+  padding: 2px 8px !important;
   display: block !important;
+  line-height: 1.35 !important;
+  min-height: 1.35em !important;
+  overflow: visible !important;
+}
+
+body.tm-terminal-theme [role='log'] [role='row'] * {
+  overflow: visible !important;
+  line-height: 1.35 !important;
 }
 
 /* ─── inputs ─── */
@@ -396,6 +599,98 @@ body.tm-terminal-theme *::-webkit-scrollbar-thumb:hover {
   font-family: var(--tm-font-stack);
 }
 
+/* ─── search overlay (Cmd+Shift+S) ─── */
+#tm-search-root {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+  display: none;
+  font-family: var(--tm-font-stack);
+}
+
+#tm-search-root.tm-search-open {
+  display: block;
+  pointer-events: auto;
+}
+
+#tm-search-root .tm-search-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92) !important;
+}
+
+#tm-search-root .tm-search-panel {
+  position: absolute;
+  left: 50%;
+  top: 12vh;
+  transform: translateX(-50%);
+  width: min(680px, calc(100vw - 24px));
+  background: var(--tm-bg) !important;
+  color: var(--tm-text) !important;
+  border: 1px solid var(--tm-dim);
+  padding: 8px 10px;
+  opacity: 1 !important;
+}
+
+#tm-search-root .tm-search-title {
+  color: var(--tm-muted) !important;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+#tm-search-root .tm-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent !important;
+  color: var(--tm-text) !important;
+  border: none;
+  border-bottom: 1px solid var(--tm-dim);
+  padding: 4px 0;
+  font-size: 13px;
+  font-family: var(--tm-font-stack);
+  outline: none;
+  caret-color: var(--tm-accent);
+}
+
+#tm-search-root .tm-search-input:focus {
+  border-bottom-color: var(--tm-accent);
+}
+
+#tm-search-root .tm-search-results {
+  margin: 6px 0 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+#tm-search-root .tm-search-result,
+#tm-search-root .tm-search-hint {
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--tm-text) !important;
+  border-left: 2px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#tm-search-root .tm-search-result {
+  cursor: pointer;
+}
+
+#tm-search-root .tm-search-result.tm-search-active,
+#tm-search-root .tm-search-result:hover {
+  background: var(--tm-dim) !important;
+  border-left-color: var(--tm-accent);
+}
+
+#tm-search-root .tm-search-hint {
+  color: var(--tm-muted) !important;
+  cursor: default;
+}
+
 /* ─── toast ─── */
 #tm-toast {
   position: fixed;
@@ -414,4 +709,101 @@ body.tm-terminal-theme *::-webkit-scrollbar-thumb:hover {
 
 #tm-toast.tm-toast-visible {
   opacity: 1;
+}
+
+/* ─── ultra terminal mode: chat-only, position log + composer fullscreen ─── */
+body.tm-ultra [role='complementary'],
+body.tm-ultra [role='banner'],
+body.tm-ultra [role='navigation'],
+body.tm-ultra aside,
+body.tm-ultra [aria-label='Chats'],
+body.tm-ultra [aria-label*='Chats list'],
+body.tm-ultra [aria-label*='conversation list'],
+body.tm-ultra [data-pagelet*='LeftRail'],
+body.tm-ultra [data-pagelet*='ChatTab'],
+body.tm-ultra [data-pagelet*='Chats'],
+body.tm-ultra [role='main'] [role='heading'],
+body.tm-ultra [role='main'] [role='button'][aria-label*='call'],
+body.tm-ultra [role='main'] [role='button'][aria-label*='Conversation information'],
+body.tm-ultra [role='main'] [role='button'][aria-label*='Show details'],
+body.tm-ultra [role='main'] [aria-label*='Choose a sticker'],
+body.tm-ultra [role='main'] [aria-label*='Send a GIF'],
+body.tm-ultra [role='main'] [aria-label*='Voice message'],
+body.tm-ultra [role='main'] [aria-label*='Open emoji'],
+body.tm-ultra [role='main'] [aria-label*='Send like'],
+body.tm-ultra [role='main'] [aria-label*='Camera'],
+body.tm-ultra [role='main'] [aria-label*='Attach'] {
+  display: none !important;
+}
+
+body.tm-ultra [role='main'] {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  flex: 1 1 100% !important;
+}
+
+/* tagged in JS: the log and composer container get fixed-fullscreen positioning so
+   nothing else can take up real estate even if FB still renders it. */
+body.tm-ultra [data-tm-ultra-log] {
+  position: fixed !important;
+  top: var(--tm-statusline-height) !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 40px !important;
+  z-index: 100 !important;
+  background: var(--tm-bg) !important;
+  overflow-y: auto !important;
+  padding: 4px 8px !important;
+}
+
+body.tm-ultra [data-tm-ultra-composer] {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 100 !important;
+  background: var(--tm-bg) !important;
+  border-top: 1px solid var(--tm-dim) !important;
+  padding: 4px 8px !important;
+}
+
+body.tm-ultra [role='log'] [role='row'] {
+  padding: 0 2px !important;
+  line-height: 1.2 !important;
+  min-height: unset !important;
+}
+
+body.tm-ultra [role='log'] [role='row'] * {
+  min-height: unset !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+body.tm-ultra [role='log'] img,
+body.tm-ultra [role='log'] video {
+  max-width: 220px !important;
+  max-height: 160px !important;
+}
+
+/* direction-coded message colors (only meaningful with tm-ultra). */
+body.tm-terminal-theme [data-tm-direction='out'],
+body.tm-terminal-theme [data-tm-direction='out'] *,
+body.tm-terminal-theme [data-tm-direction='out'] span,
+body.tm-terminal-theme [data-tm-direction='out'] div {
+  color: var(--tm-accent) !important;
+}
+
+body.tm-terminal-theme [data-tm-direction='in'],
+body.tm-terminal-theme [data-tm-direction='in'] *,
+body.tm-terminal-theme [data-tm-direction='in'] span,
+body.tm-terminal-theme [data-tm-direction='in'] div {
+  color: var(--tm-text) !important;
+}
+
+/* in non-ultra modes, keep messages neutral so the colors don't fight the theme */
+body.tm-terminal-theme:not(.tm-ultra) [data-tm-direction='out'],
+body.tm-terminal-theme:not(.tm-ultra) [data-tm-direction='out'] *,
+body.tm-terminal-theme:not(.tm-ultra) [data-tm-direction='in'],
+body.tm-terminal-theme:not(.tm-ultra) [data-tm-direction='in'] * {
+  color: var(--tm-text) !important;
 }
