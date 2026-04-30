@@ -24,6 +24,7 @@
       "target": [
         { "target": "dir", "arch": ["arm64"] }
       ],
+      "icon": "build/icon.icns",
       "identity": null
     },
     "directories": {

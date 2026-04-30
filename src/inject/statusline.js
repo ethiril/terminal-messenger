@@ -28,6 +28,16 @@ function buildFlagSummary() {
 }
 
 function updateStatuslineContent() {
+  /* in vanilla mode the statusline is removed by applyDocumentTheme; the
+     1Hz clock tick would otherwise re-create it via ensureStatuslineElement
+     a second later. bail before that recreation, and clean up an existing
+     statusline if one snuck through. */
+  if (settings.themeDisabled) {
+    const stale = document.getElementById(STATUSLINE_ELEMENT_ID);
+    if (stale) stale.remove();
+    return;
+  }
+
   const statusline = ensureStatuslineElement();
   const pathElement = statusline.querySelector('.tm-prompt-path');
   const presenceElement = statusline.querySelector('.tm-prompt-presence');
