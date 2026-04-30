@@ -26,6 +26,7 @@ function shortcutHandlerFor(input) {
   if (isPrimaryModifier && isShift && pressedKey === 'u') return (win) => runRendererAction(win, 'toggleUltra');
   if (isPrimaryModifier && isShift && pressedKey === 's') return (win) => runRendererAction(win, 'openSearchOverlay');
   if (isPrimaryModifier && isShift && pressedKey === 'm') return (win) => runRendererAction(win, 'toggleMuted');
+  if (isPrimaryModifier && isShift && pressedKey === 'y') return (win) => runRendererAction(win, 'toggleThemeDisabled');
   if (isAlt && pressedKey === 'left') return (win) => { if (win.webContents.canGoBack()) win.webContents.goBack(); };
   if (isAlt && pressedKey === 'right') return (win) => { if (win.webContents.canGoForward()) win.webContents.goForward(); };
 

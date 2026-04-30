@@ -46,6 +46,12 @@ function handleKeyboardShortcut(event) {
     event.stopPropagation();
     return;
   }
+  if (isShiftCombo && pressedKey === 'y') {
+    toggleThemeDisabled();
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
   if (event.key === '/' && !isUserTypingInto(event.target)) {
     openPalette(':');
     event.preventDefault();
@@ -130,6 +136,8 @@ window.TerminalMessenger = {
   setTheme,
   setUltra,
   toggleUltra,
+  setThemeDisabled,
+  toggleThemeDisabled,
   setOpacityPct,
   setMuted,
   toggleMuted,

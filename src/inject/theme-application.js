@@ -2,6 +2,25 @@ function applyDocumentTheme() {
   const documentRoot = document.documentElement;
   if (!documentRoot) return;
 
+  /* vanilla-mode escape hatch: when settings.themeDisabled is true, strip
+     every terminal-mode class from <html>/<body>, remove the statusline,
+     and bail before any of the JS-based tagging runs. all of the CSS
+     selectors are scoped under .tm-terminal-theme, so removing the body
+     class is enough to fully restore fb's native messenger UI. */
+  if (settings.themeDisabled) {
+    documentRoot.classList.remove('tm-terminal-theme', 'tm-ready', 'tm-platform-darwin');
+    for (const theme of VALID_THEMES) documentRoot.classList.remove(`tm-theme-${theme}`);
+
+    const body = document.body;
+    if (body) {
+      body.classList.remove('tm-terminal-theme', 'tm-ultra', 'tm-platform-darwin');
+    }
+
+    const statusline = document.getElementById('tm-statusline');
+    if (statusline) statusline.remove();
+    return;
+  }
+
   documentRoot.classList.add('tm-terminal-theme', 'tm-ready');
   for (const theme of VALID_THEMES) documentRoot.classList.remove(`tm-theme-${theme}`);
   documentRoot.classList.add(`tm-theme-${settings.theme}`);
@@ -67,6 +86,17 @@ function setUltra(enabled) {
 
 function toggleUltra() {
   setUltra(!settings.ultra);
+}
+
+function setThemeDisabled(disabled) {
+  settings.themeDisabled = Boolean(disabled);
+  persistSettings(settings);
+  applyDocumentTheme();
+  showToast(`mode=${settings.themeDisabled ? 'vanilla' : 'terminal'}`);
+}
+
+function toggleThemeDisabled() {
+  setThemeDisabled(!settings.themeDisabled);
 }
 
 function setOpacityPct(rawPct) {

@@ -2,7 +2,8 @@ const STORAGE_KEYS = Object.freeze({
   theme: 'terminalMessenger.theme',
   ultra: 'terminalMessenger.ultra',
   opacity: 'terminalMessenger.opacity',
-  muted: 'terminalMessenger.muted'
+  muted: 'terminalMessenger.muted',
+  themeDisabled: 'terminalMessenger.themeDisabled'
 });
 
 const VALID_THEMES = ['green', 'amber', 'cyan', 'mono'];
@@ -48,12 +49,14 @@ function loadInitialSettings(userConfig) {
   const savedUltra = readStoredBoolean(STORAGE_KEYS.ultra);
   const savedOpacity = readStoredOpacityPct();
   const savedMuted = readStoredBoolean(STORAGE_KEYS.muted);
+  const savedDisabled = readStoredBoolean(STORAGE_KEYS.themeDisabled);
 
   return {
     theme: VALID_THEMES.includes(savedTheme) ? savedTheme : normaliseTheme(userConfig.theme),
     ultra: savedUltra ?? false,
     opacityPct: savedOpacity ?? MAX_OPACITY_PCT,
-    muted: savedMuted ?? false
+    muted: savedMuted ?? false,
+    themeDisabled: savedDisabled ?? false
   };
 }
 
@@ -63,6 +66,7 @@ function persistSettings(settings) {
     localStorage.setItem(STORAGE_KEYS.ultra, String(settings.ultra));
     localStorage.setItem(STORAGE_KEYS.opacity, String(settings.opacityPct));
     localStorage.setItem(STORAGE_KEYS.muted, String(settings.muted));
+    localStorage.setItem(STORAGE_KEYS.themeDisabled, String(settings.themeDisabled));
   } catch {
     // localStorage may be unavailable (private mode, quota exceeded); ignore.
   }

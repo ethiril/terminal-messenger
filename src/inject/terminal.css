@@ -907,14 +907,21 @@ body.tm-terminal-theme [role='tooltip'] {
 
 /* doubled body class boosts specificity above the [data-tm-direction='in/out']
    color rules later in this file so reply quotes always read as dim. the
-   left border + indent is the visual anchor when fb's color overrides slip
-   through and the muted-text alone isn't readable as "this was quoted". */
+   leading border + indent is the visual anchor when fb's color overrides
+   slip through and the muted-text alone isn't readable as "this was quoted".
+
+   inline-block + max-width: 100% so the quote shrinks to the width of its
+   text content - otherwise display:block makes the quote span the entire
+   row and the border-left renders at the row's leading edge (far from
+   the right-aligned text on outgoing replies, showing as a stranded
+   vertical bar where the chat list meets the message area). */
 body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] {
-  display: block !important;
-  border-left: 2px solid var(--tm-muted) !important;
+  display: inline-block !important;
+  border-inline-start: 2px solid var(--tm-muted) !important;
   padding: 1px 0 1px 8px !important;
   margin: 2px 0 !important;
   opacity: 0.55 !important;
+  max-width: 100% !important;
 }
 
 body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote],
@@ -1396,22 +1403,41 @@ body.tm-ultra [data-tm-ultra-composer] {
   padding: 4px 8px !important;
 }
 
-/* fb's native composer adds a small left inset on :hover (presumably to
-   line up an icon or affordance) which reads as a layout jump in ultra
-   mode. nullify hover-driven padding/margin shifts inside the composer so
-   the text bar's geometry stays fixed regardless of cursor position. */
-body.tm-ultra [data-tm-ultra-composer]:hover,
-body.tm-ultra [data-tm-ultra-composer] *:hover {
-  padding-left: revert !important;
-  padding-inline-start: revert !important;
-  margin-left: revert !important;
-  margin-inline-start: revert !important;
-  transform: none !important;
-}
-
+/* kill animations/transitions in the composer so any state-driven layout
+   change is instant rather than visibly animated. */
 body.tm-ultra [data-tm-ultra-composer],
 body.tm-ultra [data-tm-ultra-composer] * {
   transition: none !important;
+  animation: none !important;
+}
+
+/* fb sometimes reveals a secondary navigation rail or a media-attachment
+   tray on composer hover that we don't want in ultra mode. hide any
+   fixed/absolutely positioned chrome that lives outside the message log
+   and composer scopes (the only two we want visible in ultra). */
+body.tm-ultra [role='banner']:not([role='log'] [role='banner']),
+body.tm-ultra [role='navigation']:not([role='log'] [role='navigation']):not([data-tm-thread] [role='navigation']):not([data-tm-ultra-composer] [role='navigation']),
+body.tm-ultra nav:not([role='log'] nav):not([data-tm-thread] nav):not([data-tm-ultra-composer] nav),
+body.tm-ultra [data-pagelet*='LeftNav' i],
+body.tm-ultra [data-pagelet*='SideNav' i],
+body.tm-ultra [aria-label='Primary navigation' i],
+body.tm-ultra [aria-label*='Main menu' i],
+body.tm-ultra [role='tablist']:not([role='log'] [role='tablist']):not([data-tm-thread] [role='tablist']):not([data-tm-ultra-composer] [role='tablist']):not([role='dialog'] [role='tablist']) {
+  display: none !important;
+}
+
+/* allow imagery in the composer scope so attached/pasted image previews
+   render before send (they live in the composer area, which isn't in any
+   of the imagery-allow scopes we set up for the message log + dialogs) */
+body.tm-terminal-theme [data-tm-ultra-composer] img,
+body.tm-terminal-theme [data-tm-ultra-composer] picture,
+body.tm-terminal-theme [data-tm-ultra-composer] video,
+body.tm-terminal-theme [data-tm-ultra-composer] canvas,
+body.tm-terminal-theme [data-tm-ultra-composer] i[data-visualcompletion='css-img'],
+body.tm-terminal-theme [aria-label*='attachment' i] img,
+body.tm-terminal-theme [aria-label*='attachment' i] picture,
+body.tm-terminal-theme [aria-label*='attachment' i] video {
+  display: revert !important;
 }
 
 /* ─── text selection in messages ─── */
