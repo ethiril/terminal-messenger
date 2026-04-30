@@ -6,6 +6,10 @@ const { runRendererAction } = require('./renderer-bridge');
 
 const PRELOAD_SCRIPT_PATH = path.join(__dirname, '..', 'preload.js');
 const FIRST_PAINT_FALLBACK_MS = 5000;
+/* fb messenger leaks renderer memory over long sessions (large react tree,
+   scroll-virtualised log backbuffer, retained media). reload every 30m
+   while the window is unfocused so we never interrupt active typing. */
+const RENDERER_REFRESH_INTERVAL_MS = 30 * 60 * 1000;
 
 function shortcutHandlerFor(input) {
   const pressedKey = input.key?.toLowerCase();
@@ -97,6 +101,13 @@ function createMessengerWindow(appConfig, sessionPartition) {
     handler(messengerWindow);
     event.preventDefault();
   });
+
+  const refreshInterval = setInterval(() => {
+    if (messengerWindow.isDestroyed()) return;
+    if (messengerWindow.isFocused()) return;
+    messengerWindow.webContents.reload();
+  }, RENDERER_REFRESH_INTERVAL_MS);
+  messengerWindow.on('closed', () => clearInterval(refreshInterval));
 
   messengerWindow.loadURL(appConfig.homeUrl);
   return messengerWindow;

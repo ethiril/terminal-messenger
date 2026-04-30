@@ -352,26 +352,24 @@ body.tm-terminal-theme [role='log'] img[data-tm-img-size='small'] {
   opacity: 0.6 !important;
 }
 
-body.tm-terminal-theme [data-tm-chat-list] img,
-body.tm-terminal-theme [data-tm-chat-list] picture,
-body.tm-terminal-theme [data-tm-chat-list] i[data-visualcompletion='css-img'] {
-  width: 18px !important;
-  height: 18px !important;
-  max-width: 18px !important;
-  max-height: 18px !important;
-  min-width: 18px !important;
-  min-height: 18px !important;
-  border-radius: 50% !important;
-  border: 1px solid var(--tm-dim) !important;
-  display: inline-block !important;
-  vertical-align: middle !important;
-  align-self: center !important;
-  margin: 0 4px 0 0 !important;
-  opacity: 0.7 !important;
-  object-fit: cover !important;
-  background-size: cover !important;
-  background-position: center !important;
-  flex-shrink: 0 !important;
+/* drop chat-list avatars entirely so each row reads as just "Name / preview
+   · timestamp". hide every imagery type fb might use for the avatar plus the
+   square-aspect-ratio wrapper (--x-paddingTop:100%) and the marker fb stamps
+   on dynamic-loaded thumbnails (data-visualcompletion="ignore-dynamic") so
+   no blank column is reserved where the picture used to sit. */
+body.tm-terminal-theme [data-tm-chat-list] [role='row'] img,
+body.tm-terminal-theme [data-tm-chat-list] [role='row'] picture,
+body.tm-terminal-theme [data-tm-chat-list] [role='row'] svg,
+body.tm-terminal-theme [data-tm-chat-list] [role='row'] i[data-visualcompletion='css-img'],
+body.tm-terminal-theme [data-tm-chat-list] [role='row'] [data-visualcompletion='ignore-dynamic'],
+body.tm-terminal-theme [data-tm-chat-list] [role='row'] [style*='--x-paddingTop'],
+body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] img,
+body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] picture,
+body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] svg,
+body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] i[data-visualcompletion='css-img'],
+body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] [data-visualcompletion='ignore-dynamic'],
+body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] [style*='--x-paddingTop'] {
+  display: none !important;
 }
 
 /* fb wraps avatars in an <svg> with a circular <mask>; the global svg crush
@@ -433,6 +431,34 @@ body.tm-terminal-theme dialog canvas {
   clip-path: none !important;
   transform: none !important;
   mix-blend-mode: normal !important;
+}
+
+/* the dialog img rule above sets width/height: auto so half-stripped photo
+   previews don't render at zero - but fb's emoji picker is also a dialog,
+   and each tile is an <img> that then renders at its natural retina size
+   (~60px). anchor on the picker's "Search emoji" input and cap tiles. */
+body.tm-terminal-theme [role='dialog']:has(input[placeholder*='emoji' i]) img,
+body.tm-terminal-theme [role='dialog']:has(input[placeholder*='emoji' i]) picture,
+body.tm-terminal-theme [role='dialog']:has(input[placeholder*='emoji' i]) i[data-visualcompletion='css-img'],
+body.tm-terminal-theme [role='dialog']:has(input[aria-label*='emoji' i]) img,
+body.tm-terminal-theme [role='dialog']:has(input[aria-label*='emoji' i]) picture,
+body.tm-terminal-theme [role='dialog']:has(input[aria-label*='emoji' i]) i[data-visualcompletion='css-img'],
+body.tm-terminal-theme [aria-modal='true']:has(input[placeholder*='emoji' i]) img,
+body.tm-terminal-theme [aria-modal='true']:has(input[placeholder*='emoji' i]) picture,
+body.tm-terminal-theme [aria-modal='true']:has(input[placeholder*='emoji' i]) i[data-visualcompletion='css-img'],
+body.tm-terminal-theme [aria-modal='true']:has(input[aria-label*='emoji' i]) img,
+body.tm-terminal-theme [aria-modal='true']:has(input[aria-label*='emoji' i]) picture,
+body.tm-terminal-theme [aria-modal='true']:has(input[aria-label*='emoji' i]) i[data-visualcompletion='css-img'] {
+  width: 24px !important;
+  height: 24px !important;
+  max-width: 24px !important;
+  max-height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  object-fit: contain !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
 }
 
 body.tm-terminal-theme [role='log'] svg,
@@ -653,6 +679,86 @@ body.tm-terminal-theme [role='log'] [role='row'] * {
   overflow: visible !important;
   line-height: var(--tm-line-height) !important;
   max-height: none !important;
+}
+
+/* fb's [aria-roledescription="message"] wrapper is a column flex with five
+   children: a sender/timestamp header (empty <h3> when consecutive messages
+   come from the same author), a 2px spacer, the bubble row, a 6px spacer,
+   and a trailing footer block (read-receipt slot). when header and footer
+   are empty they should collapse to 0, but our universal font-size +
+   line-height resets give the empty <h3> a visible line box and the empty
+   footer picks up flex defaults - the bubble ends up sitting near the top
+   of a 36px wrapper with stranded space below. collapse both when empty. */
+body.tm-terminal-theme [role='log'] [aria-roledescription='message'] > [role='presentation']:first-child:has(h3:empty):not(:has(h3 *)),
+body.tm-terminal-theme [data-tm-thread] [aria-roledescription='message'] > [role='presentation']:first-child:has(h3:empty):not(:has(h3 *)),
+body.tm-terminal-theme [role='log'] [aria-roledescription='message'] > div:last-child:not([role]):empty,
+body.tm-terminal-theme [data-tm-thread] [aria-roledescription='message'] > div:last-child:not([role]):empty {
+  display: none !important;
+}
+
+/* fb renders the per-message action toolbar (React / Reply / More) as a
+   regular flex sibling of the bubble inside the bubble row, toggling it
+   from display:none -> display:flex on hover. when it pops in, its ~32px
+   buttons stretch the row, the bubble (default align-items:stretch) grows
+   to match, and the text inside anchors to the top of the grown box - so
+   the text clips at the top and visibly jumps as the row resizes between
+   hover states. fix it by keeping the toolbar in flow at all times
+   (visibility toggle replaces fb's display toggle, so the row reserves a
+   constant height) and capping the toolbar to a tight ~18px footprint so
+   the row doesn't loom much taller than the text.
+
+   note: this build of fb messenger nests messages inside [role='article']
+   with [aria-roledescription='message'] rather than [role='row'], so the
+   older [role='log'] [role='row'] [data-tm-action-toolbar] rule (further
+   down) silently misses every row in this layout. anchoring directly on
+   [aria-roledescription='message'] catches both. */
+body.tm-terminal-theme [aria-roledescription='message'] > [role='presentation']:has([role='toolbar']) {
+  align-items: center !important;
+}
+
+body.tm-terminal-theme [aria-roledescription='message'] [role='toolbar'][aria-label='Message actions' i] {
+  display: flex !important;
+  visibility: hidden !important;
+  align-items: center !important;
+  gap: 2px !important;
+}
+
+body.tm-terminal-theme [aria-roledescription='message']:hover [role='toolbar'][aria-label='Message actions' i],
+body.tm-terminal-theme [aria-roledescription='message']:focus-within [role='toolbar'][aria-label='Message actions' i] {
+  visibility: visible !important;
+}
+
+/* shrink the buttons + their inner svg so a row's natural height ≈ text
+   line height. fb default ~32px otherwise dominates the row */
+body.tm-terminal-theme [aria-roledescription='message'] [role='toolbar'][aria-label='Message actions' i] [role='button'] {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  max-width: 18px !important;
+  max-height: 18px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+body.tm-terminal-theme [aria-roledescription='message'] [role='toolbar'][aria-label='Message actions' i] [role='button'] svg {
+  width: 12px !important;
+  height: 12px !important;
+  max-width: 12px !important;
+  max-height: 12px !important;
+}
+
+/* the toolbar slot is the trailing sibling of the bubble in DOM order, so
+   it naturally sits to the right of the bubble in flex flow. for outgoing
+   messages we want it on the LEFT of the bubble (in the empty leading
+   space), so flip it to the front of the flex order. incoming keeps the
+   default order so it lands on the bubble's right side. */
+body.tm-terminal-theme [aria-roledescription='message'][data-tm-direction='out'] > [role='presentation']:has([role='toolbar']) > [role='presentation']:has([role='toolbar']) {
+  order: -1 !important;
 }
 
 /* tagged in JS via [data-tm-action-button] - matching in CSS via aria-label

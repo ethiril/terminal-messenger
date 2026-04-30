@@ -1,6 +1,9 @@
 function inferMessageDirection(messageRow) {
   const ariaLabel = messageRow.getAttribute('aria-label') ?? '';
-  if (/you sent|you said|outgoing/i.test(ariaLabel)) return 'out';
+  /* fb formats outgoing aria-labels as "At <time>, You: <text>" or "You sent
+     a <thing>" - both forms include the standalone token "You" followed by
+     a colon or " sent ". incoming labels lead with the sender's name. */
+  if (/\byou sent\b|\byou said\b|\bYou:\s|\boutgoing\b/i.test(ariaLabel)) return 'out';
 
   const rowRect = messageRow.getBoundingClientRect();
   if (rowRect.width === 0) return null;
@@ -16,8 +19,16 @@ function inferMessageDirection(messageRow) {
   return bubbleCenter > rowCenter + OUTGOING_BUBBLE_OFFSET_PX ? 'out' : 'in';
 }
 
+/* fb has shipped two layouts: an older one where each message sits in
+   [role='row'] and a newer one where it sits in [role='article'] with
+   [aria-roledescription='message']. tag both so direction-scoped CSS works
+   regardless of which build the user is on. */
 function tagMessageDirections() {
-  const messageRows = document.querySelectorAll('[role="log"] [role="row"]:not([data-tm-direction])');
+  const messageRows = document.querySelectorAll(
+    '[role="log"] [role="row"]:not([data-tm-direction]),'
+    + '[role="log"] [aria-roledescription="message"]:not([data-tm-direction]),'
+    + '[data-tm-thread] [aria-roledescription="message"]:not([data-tm-direction])'
+  );
   for (const messageRow of messageRows) {
     const direction = inferMessageDirection(messageRow);
     if (direction) messageRow.setAttribute('data-tm-direction', direction);
