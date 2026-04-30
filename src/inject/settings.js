@@ -6,7 +6,7 @@ const STORAGE_KEYS = Object.freeze({
   themeDisabled: 'terminalMessenger.themeDisabled'
 });
 
-const VALID_THEMES = ['green', 'amber', 'cyan', 'mono'];
+const VALID_THEMES = ['green', 'amber', 'cyan', 'mono', 'mocha', 'neon', 'macchiato', 'frappe', 'latte'];
 const DEFAULT_THEME = 'green';
 const MIN_OPACITY_PCT = 20;
 const MAX_OPACITY_PCT = 100;

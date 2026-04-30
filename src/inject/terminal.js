@@ -114,6 +114,87 @@ function bindMessageFocusReleaser() {
   document.addEventListener('pointerdown', handleBackgroundPointerDown, true);
 }
 
+/* fb blocks drag-selection in messenger using two layers of defense:
+   (1) capture-phase event handlers that call event.preventDefault() on
+       mousedown/selectstart/dragstart, and
+   (2) inline onmousedown="return false" handlers on bubble wrappers.
+
+   stopping propagation at the window level neutralizes (1) only when
+   our listener runs first, which isn't guaranteed if fb registered on
+   window at capture phase before our injection ran. and stopping
+   propagation does nothing about (2), since inline handlers fire at
+   target phase regardless.
+
+   the only fully reliable counter is to neutralize preventDefault()
+   itself for selection-related events when the target is inside a
+   message surface. monkey-patching Event.prototype.preventDefault is
+   surgical: it only no-ops the call when type+target match, and
+   passes through unchanged for everything else (link clicks etc).
+
+   we also stopImmediatePropagation as a belt-and-suspenders measure -
+   useful for fb listeners that don't preventDefault but instead clear
+   the selection programmatically (selection.removeAllRanges). runs in
+   both terminal and vanilla mode. */
+function bindSelectionUnblocker() {
+  const SELECTABLE_SURFACE_SELECTOR =
+    "[role='log'], [data-tm-thread], [aria-roledescription='message'],"
+    + " [aria-label*='Messages in conversation'], [role='article']";
+  const INTERACTIVE_TARGET_SELECTOR =
+    "a, button, [role='button'], [role='link'], [role='menuitem'], img, video,"
+    + " input, textarea, [contenteditable='true'], [role='textbox']";
+  const NEUTRALIZED_EVENT_TYPES = new Set([
+    'mousedown', 'selectstart', 'dragstart'
+  ]);
+
+  const isInsideSelectableSurface = (target) => {
+    if (!(target instanceof Element)) return false;
+    return Boolean(target.closest(SELECTABLE_SURFACE_SELECTOR));
+  };
+
+  /* monkey-patch Event.prototype.preventDefault so fb's handlers can't
+     stop selection from starting. only no-ops for the relevant event
+     types when target is inside a message surface; everything else
+     passes through to the original. covers both delegated handlers
+     and inline onfoo="return false" attributes. */
+  const originalPreventDefault = Event.prototype.preventDefault;
+  Event.prototype.preventDefault = function patchedPreventDefault() {
+    if (NEUTRALIZED_EVENT_TYPES.has(this.type)) {
+      const target = this.target;
+      if (target instanceof Element
+          && !target.closest(INTERACTIVE_TARGET_SELECTOR)
+          && target.closest(SELECTABLE_SURFACE_SELECTOR)) {
+        return;
+      }
+    }
+    return originalPreventDefault.apply(this, arguments);
+  };
+
+  /* register on window at capture phase: capture dispatches window →
+     document → ... in tree order, so a window-level capture listener
+     fires before any of fb's handlers at document or descendants. */
+  window.addEventListener('mousedown', (event) => {
+    if (event.button !== 0) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest(INTERACTIVE_TARGET_SELECTOR)) return;
+    if (!isInsideSelectableSurface(target)) return;
+    event.stopImmediatePropagation();
+  }, true);
+
+  window.addEventListener('selectstart', (event) => {
+    if (!isInsideSelectableSurface(event.target)) return;
+    event.stopImmediatePropagation();
+  }, true);
+
+  window.addEventListener('dragstart', (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.matches('img, video, a')) return;
+    if (!isInsideSelectableSurface(target)) return;
+    event.stopImmediatePropagation();
+  }, true);
+}
+
 function start() {
   applyDocumentTheme();
   applyWindowOpacity(settings.opacityPct);
@@ -121,6 +202,7 @@ function start() {
   bindKeyboardShortcuts();
   bindMediaViewerEvents();
   bindMessageFocusReleaser();
+  bindSelectionUnblocker();
   startMutationObserver();
   startStatuslineClock();
 }

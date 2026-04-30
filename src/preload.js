@@ -2,13 +2,18 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const STORAGE_KEY_THEME = 'terminalMessenger.theme';
 const STORAGE_KEY_OPACITY = 'terminalMessenger.opacity';
-const VALID_THEMES = ['green', 'amber', 'cyan', 'mono'];
+const VALID_THEMES = ['green', 'amber', 'cyan', 'mono', 'mocha', 'neon', 'macchiato', 'frappe', 'latte'];
 
 const EARLY_THEME_PALETTES = {
   green: { background: '#050805', foreground: '#c8e8c0' },
   amber: { background: '#0a0700', foreground: '#f5d99a' },
   cyan: { background: '#02080d', foreground: '#c0e8f5' },
-  mono: { background: '#080808', foreground: '#d8d8d8' }
+  mono: { background: '#080808', foreground: '#d8d8d8' },
+  mocha: { background: '#1e1e2e', foreground: '#cdd6f4' },
+  neon: { background: '#0a0518', foreground: '#d4c8ff' },
+  macchiato: { background: '#24273a', foreground: '#cad3f5' },
+  frappe: { background: '#303446', foreground: '#c6d0f5' },
+  latte: { background: '#eff1f5', foreground: '#4c4f69' }
 };
 
 const EARLY_STYLE_ELEMENT_ID = 'tm-early-style';

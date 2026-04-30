@@ -15,12 +15,22 @@ function applyDocumentTheme() {
      the existing #tm-statusline rule + the [data-tm-vanilla] override
      blanks its visual content and clears its content. */
   if (settings.themeDisabled) {
-    documentRoot.classList.remove('tm-terminal-theme', 'tm-ready', 'tm-platform-darwin');
+    documentRoot.classList.remove('tm-terminal-theme', 'tm-ready');
     for (const theme of VALID_THEMES) documentRoot.classList.remove(`tm-theme-${theme}`);
 
     const body = document.body;
     if (body) {
-      body.classList.remove('tm-terminal-theme', 'tm-ultra', 'tm-platform-darwin');
+      body.classList.remove('tm-terminal-theme', 'tm-ultra');
+    }
+
+    /* keep the platform-darwin marker on <html> so the vanilla-mode drag
+       strip can be sized differently on macOS (taller, to cover the
+       traffic-light row) than on win/linux. */
+    if (/Mac|iPhone|iPad/i.test(navigator.platform ?? '')) {
+      documentRoot.classList.add('tm-platform-darwin');
+    } else {
+      documentRoot.classList.remove('tm-platform-darwin');
+      if (body) body.classList.remove('tm-platform-darwin');
     }
 
     const statusline = ensureStatuslineElement();

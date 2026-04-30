@@ -35,6 +35,52 @@ html.tm-theme-mono {
   --tm-dim: #222222;
 }
 
+/* catppuccin mocha: base / text / overlay1 / mauve / surface0 */
+html.tm-theme-mocha {
+  --tm-bg: #1e1e2e;
+  --tm-text: #cdd6f4;
+  --tm-muted: #7f849c;
+  --tm-accent: #cba6f7;
+  --tm-dim: #313244;
+}
+
+/* neon: cyberpunk / synthwave palette - deep purple-black bg, lavender
+   body text, pastel-electric blue accent (used for sent messages). */
+html.tm-theme-neon {
+  --tm-bg: #0a0518;
+  --tm-text: #d4c8ff;
+  --tm-muted: #6a5085;
+  --tm-accent: #6dc4ff;
+  --tm-dim: #18102a;
+}
+
+/* catppuccin macchiato */
+html.tm-theme-macchiato {
+  --tm-bg: #24273a;
+  --tm-text: #cad3f5;
+  --tm-muted: #8087a2;
+  --tm-accent: #c6a0f6;
+  --tm-dim: #363a4f;
+}
+
+/* catppuccin frappe */
+html.tm-theme-frappe {
+  --tm-bg: #303446;
+  --tm-text: #c6d0f5;
+  --tm-muted: #838ba7;
+  --tm-accent: #ca9ee6;
+  --tm-dim: #414559;
+}
+
+/* catppuccin latte (light): base / text / overlay1 / mauve / surface0 */
+html.tm-theme-latte {
+  --tm-bg: #eff1f5;
+  --tm-text: #4c4f69;
+  --tm-muted: #8c8fa1;
+  --tm-accent: #8839ef;
+  --tm-dim: #ccd0da;
+}
+
 /* hide the page until terminal.js attaches so we never flash unstyled fb */
 html.tm-terminal-theme {
   background: var(--tm-bg) !important;
@@ -114,6 +160,15 @@ body.tm-terminal-theme [role='link'],
 body.tm-terminal-theme [role='tabpanel'] {
   background-color: transparent !important;
   border-color: var(--tm-dim) !important;
+  /* fb has :hover rules on wrapping panels (top bar, composer wrapper,
+     message thread pane) that add a leading-edge 1px border + padding
+     shift. without locking border-style, our border-color override
+     paints whatever width fb adds in tm-dim, so a thin accent bar
+     appears at x=0 the moment the user mouses over those panels.
+     elements that do need borders (dialogs, inputs, the active-thread
+     row, ultra composer divider) re-establish style:solid via the
+     `border:` shorthand in higher source-order rules below. */
+  border-style: none !important;
 }
 
 /* overlays must stay opaque or the chat list bleeds through */
@@ -631,7 +686,16 @@ body.tm-terminal-theme [role='button']:hover {
   outline: none !important;
 }
 
-body.tm-terminal-theme [aria-selected='true'],
+/* the active-thread accent bar - keep it on chat-list rows / grid cells /
+   list options / nav links / tabs. the bare [aria-selected='true']
+   selector previously matched fb's composer wrapper (which gets
+   aria-selected toggled on focus/hover), pushing the right pane right by
+   4px and lighting a 2px accent at its leading edge whenever the user
+   moused over the composer. */
+body.tm-terminal-theme [role='row'][aria-selected='true'],
+body.tm-terminal-theme [role='gridcell'][aria-selected='true'],
+body.tm-terminal-theme [role='option'][aria-selected='true'],
+body.tm-terminal-theme [role='listitem'][aria-selected='true'],
 body.tm-terminal-theme [role='link'][aria-current='page'],
 body.tm-terminal-theme [role='tab'][aria-selected='true'] {
   background: var(--tm-dim) !important;
@@ -1065,17 +1129,22 @@ html.tm-platform-darwin #tm-statusline {
   padding-left: 84px !important;
 }
 
-/* vanilla-mode drag strip: the statusline stays in the DOM as a 6px
+/* vanilla-mode drag strip: the statusline stays in the DOM as an
    invisible bar so the window remains draggable (titleBarStyle is
    'hiddenInset' - without this strip there's no in-page drag handle and
    the window is stuck in place). transparent + no border so fb's native
-   ui shows through underneath; the strip occupies the topmost 6px of the
-   viewport, which is unintrusive enough to not visibly mask anything. */
+   ui shows through underneath. */
 #tm-statusline[data-tm-vanilla] {
   height: 6px !important;
   background: transparent !important;
   border-bottom: none !important;
   padding: 0 !important;
+}
+
+/* on macOS, extend the strip to cover the traffic-light row so the whole
+   title-bar zone is grabbable (a 6px sliver is too fiddly to land on). */
+html.tm-platform-darwin #tm-statusline[data-tm-vanilla] {
+  height: 28px !important;
 }
 
 #tm-statusline .tm-prompt-arrow   { color: var(--tm-accent) !important; }
@@ -1135,7 +1204,7 @@ html.tm-platform-darwin #tm-statusline {
   color: var(--tm-text) !important;
   border: none;
   border-bottom: 1px solid var(--tm-dim);
-  padding: 4px 0;
+  padding: 4px 8px;
   font-size: 13px;
   font-family: var(--tm-font-stack);
   outline: none;
@@ -1458,15 +1527,39 @@ body.tm-terminal-theme [aria-label*='attachment' i] video {
 /* fb sets user-select:none on the message log to prevent accidental drag
    selection on touch devices, but on desktop we want highlight/copy to
    work normally. allow text selection inside the message log + thread
-   while keeping the rest of the chrome (chat list, statusline) immune. */
-body.tm-terminal-theme [role='log'],
-body.tm-terminal-theme [role='log'] *,
-body.tm-terminal-theme [data-tm-thread],
-body.tm-terminal-theme [data-tm-thread] *,
-body.tm-terminal-theme [aria-roledescription='message'],
-body.tm-terminal-theme [aria-roledescription='message'] * {
+   while keeping the rest of the chrome (chat list, statusline) immune.
+
+   not scoped to .tm-terminal-theme so vanilla mode gets selection too.
+   the `html body` prefix is purely a specificity boost - fb has
+   high-specificity user-select:none rules elsewhere that beat the
+   plain attribute-selector form, even with !important, because the
+   user-origin / author-origin !important comparison still falls back
+   to specificity at the same origin. */
+html body [role='log'],
+html body [role='log'] *,
+html body [data-tm-thread],
+html body [data-tm-thread] *,
+html body [aria-roledescription='message'],
+html body [aria-roledescription='message'] *,
+html body [aria-label*='Messages in conversation'],
+html body [aria-label*='Messages in conversation'] * {
   -webkit-user-select: text !important;
   user-select: text !important;
+  -webkit-touch-callout: default !important;
+  cursor: text !important;
+}
+
+/* explicit text cursor only on the actual text spans - don't override
+   the pointer cursor on buttons / reactions / links inside messages. */
+html body [role='log'] [role='button'],
+html body [role='log'] [role='button'] *,
+html body [role='log'] a,
+html body [role='log'] a *,
+html body [data-tm-thread] [role='button'],
+html body [data-tm-thread] [role='button'] *,
+html body [data-tm-thread] a,
+html body [data-tm-thread] a * {
+  cursor: pointer !important;
 }
 
 body.tm-ultra [role='log'] [role='row'] {
@@ -1509,6 +1602,17 @@ body.tm-terminal-theme:not(.tm-ultra) [data-tm-direction='out'] *,
 body.tm-terminal-theme:not(.tm-ultra) [data-tm-direction='in'],
 body.tm-terminal-theme:not(.tm-ultra) [data-tm-direction='in'] * {
   color: var(--tm-text) !important;
+}
+
+/* neon: pastel-blue sent messages even in non-ultra. higher specificity
+   (html.tm-theme-neon adds a class) beats the :not(.tm-ultra) override
+   above so the cyberpunk feel reads through outgoing messages without
+   needing ultra mode. */
+html.tm-theme-neon body.tm-terminal-theme [data-tm-direction='out'],
+html.tm-theme-neon body.tm-terminal-theme [data-tm-direction='out'] *,
+html.tm-theme-neon body.tm-terminal-theme [data-tm-direction='out'] span,
+html.tm-theme-neon body.tm-terminal-theme [data-tm-direction='out'] div {
+  color: var(--tm-accent) !important;
 }
 
 /* reply-quote dim wins over direction colors */

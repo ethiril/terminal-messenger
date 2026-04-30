@@ -7,7 +7,7 @@ const HELP_OUTPUT = [
   ':focus message    focus the message composer',
   ':focus search     focus messenger native search',
   ':goto <name>      open the first chat matching <name> (alias: :c)',
-  ':theme green|amber|cyan|mono',
+  ':theme green|amber|cyan|mono|mocha|neon|macchiato|frappe|latte',
   ':ultra  [on|off]  ultra terminal mode (no arg = toggle)',
   ':opacity <20-100> window transparency, in percent',
   ':mute   [on|off]  mute window audio (no arg = toggle)',
@@ -39,7 +39,7 @@ function ensurePaletteElement() {
     <section class="tm-command-panel" role="dialog" aria-modal="true" aria-label="Terminal Messenger command palette">
       <div class="tm-command-title">~/messenger %</div>
       <input class="tm-command-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder=":help" />
-      <div class="tm-command-hint">help · search · theme [green|amber|cyan|mono] · ultra [on|off] · opacity &lt;20-100&gt; · mute · focus [message|search] · unread · reload · q</div>
+      <div class="tm-command-hint">help · search · theme [green|amber|cyan|mono|mocha|neon|macchiato|frappe|latte] · ultra [on|off] · opacity &lt;20-100&gt; · mute · focus [message|search] · unread · reload · q</div>
       <pre class="tm-command-output"></pre>
     </section>
   `;
@@ -85,7 +85,7 @@ function closePalette() {
 }
 
 function runThemeCommand(commandArgs) {
-  if (!commandArgs[0]) return 'usage: :theme green|amber|cyan|mono';
+  if (!commandArgs[0]) return 'usage: :theme green|amber|cyan|mono|mocha|neon|macchiato|frappe|latte';
   setTheme(commandArgs[0]);
   return `theme=${settings.theme}`;
 }
