@@ -35,7 +35,7 @@ function shortcutHandlerFor(input) {
 
 function formatTitleWithUnreadCount(updatedTitle) {
   const unreadMatch = updatedTitle?.match(/\((\d+)\)/);
-  return unreadMatch ? `Terminal Messenger (${unreadMatch[1]})` : 'Terminal Messenger';
+  return unreadMatch ? `Messenger (${unreadMatch[1]})` : 'Messenger';
 }
 
 function createMessengerWindow(appConfig, sessionPartition) {
@@ -45,7 +45,7 @@ function createMessengerWindow(appConfig, sessionPartition) {
     height: windowSize.height ?? 860,
     minWidth: 900,
     minHeight: 600,
-    title: 'Terminal Messenger',
+    title: 'Messenger',
     backgroundColor: '#050805',
     autoHideMenuBar: true,
     show: false,

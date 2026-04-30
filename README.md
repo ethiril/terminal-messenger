@@ -28,20 +28,20 @@ The app uses `electron@latest` as a dev dependency so you can test with your cur
 
 ```bash
 npm run dist
-cp -R "dist/mac-arm64/Terminal Messenger.app" /Applications/
+cp -R "dist/mac-arm64/Messenger.app" /Applications/
 ```
 
-After that, `Terminal Messenger` is launchable from Spotlight, Alfred, Raycast, etc.
+After that, `Messenger` is launchable from Spotlight, Alfred, Raycast, etc. (Note: if you also have Meta's official Messenger desktop app installed, both bundles will share the name. Set `"productName"` in `package.json` to something like `"Messenger TUI"` to disambiguate.)
 
 To re-install after code changes (handles a running instance + a stale copy):
 
 ```bash
-osascript -e 'quit app "Terminal Messenger"' 2>/dev/null
-npm run dist && rm -rf "/Applications/Terminal Messenger.app"
-cp -R "dist/mac-arm64/Terminal Messenger.app" /Applications/
+osascript -e 'quit app "Messenger"' 2>/dev/null
+npm run dist && rm -rf "/Applications/Messenger.app"
+cp -R "dist/mac-arm64/Messenger.app" /Applications/
 ```
 
-The build is unsigned. The first launch may need **right-click → Open**, or run `xattr -cr "/Applications/Terminal Messenger.app"` to clear the quarantine attribute.
+The build is unsigned. The first launch may need **right-click → Open**, or run `xattr -cr "/Applications/Messenger.app"` to clear the quarantine attribute.
 
 ### Adding a custom icon
 
@@ -65,7 +65,7 @@ If you use a `.png`, change the path accordingly. Re-build with `npm run dist`.
 Force a re-index of the bundle:
 
 ```bash
-mdimport "/Applications/Terminal Messenger.app"
+mdimport "/Applications/Messenger.app"
 ```
 
 If Alfred still won't find it, refresh its index from **Alfred Preferences → Advanced → Rebuild macOS Metadata**.
@@ -73,7 +73,7 @@ If Alfred still won't find it, refresh its index from **Alfred Preferences → A
 To inspect what Spotlight thinks the bundle is:
 
 ```bash
-mdls -name kMDItemDisplayName -name kMDItemKind "/Applications/Terminal Messenger.app"
+mdls -name kMDItemDisplayName -name kMDItemKind "/Applications/Messenger.app"
 ```
 
 Expect `kMDItemKind = "Application"`.
