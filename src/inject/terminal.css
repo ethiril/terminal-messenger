@@ -1065,6 +1065,19 @@ html.tm-platform-darwin #tm-statusline {
   padding-left: 84px !important;
 }
 
+/* vanilla-mode drag strip: the statusline stays in the DOM as a 6px
+   invisible bar so the window remains draggable (titleBarStyle is
+   'hiddenInset' - without this strip there's no in-page drag handle and
+   the window is stuck in place). transparent + no border so fb's native
+   ui shows through underneath; the strip occupies the topmost 6px of the
+   viewport, which is unintrusive enough to not visibly mask anything. */
+#tm-statusline[data-tm-vanilla] {
+  height: 6px !important;
+  background: transparent !important;
+  border-bottom: none !important;
+  padding: 0 !important;
+}
+
 #tm-statusline .tm-prompt-arrow   { color: var(--tm-accent) !important; }
 #tm-statusline .tm-prompt-path    { color: var(--tm-text) !important; }
 #tm-statusline .tm-prompt-presence { color: var(--tm-accent) !important; opacity: 0.85; }
@@ -1471,14 +1484,10 @@ body.tm-terminal-theme [data-tm-thread] [data-tm-link-preview] {
   max-width: 480px !important;
 }
 
-body.tm-ultra [role='log'] img[data-tm-img-size='large'],
-body.tm-ultra [role='log'] video {
-  width: auto !important;
-  height: auto !important;
-  max-width: 420px !important;
-  max-height: 320px !important;
-  object-fit: contain !important;
-}
+/* image sizing in ultra used to be capped tighter (420x320 vs the 480x360
+   used in normal mode), but the smaller cap left more whitespace around
+   the bubble and felt visually less tight. let ultra inherit the normal
+   image rules for consistency. */
 
 body.tm-terminal-theme [data-tm-direction='out'],
 body.tm-terminal-theme [data-tm-direction='out'] *,

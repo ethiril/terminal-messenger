@@ -3,10 +3,17 @@ function applyDocumentTheme() {
   if (!documentRoot) return;
 
   /* vanilla-mode escape hatch: when settings.themeDisabled is true, strip
-     every terminal-mode class from <html>/<body>, remove the statusline,
-     and bail before any of the JS-based tagging runs. all of the CSS
-     selectors are scoped under .tm-terminal-theme, so removing the body
-     class is enough to fully restore fb's native messenger UI. */
+     every terminal-mode class from <html>/<body> and bail before any of
+     the JS-based tagging runs. all of the CSS selectors are scoped under
+     .tm-terminal-theme, so removing the body class is enough to fully
+     restore fb's native messenger UI.
+
+     keep the statusline element around but collapse it to a 6px
+     transparent strip - the macOS window uses titleBarStyle:'hiddenInset'
+     so without an in-page drag region the user can't move the window at
+     all in vanilla mode. the strip remains -webkit-app-region:drag via
+     the existing #tm-statusline rule + the [data-tm-vanilla] override
+     blanks its visual content and clears its content. */
   if (settings.themeDisabled) {
     documentRoot.classList.remove('tm-terminal-theme', 'tm-ready', 'tm-platform-darwin');
     for (const theme of VALID_THEMES) documentRoot.classList.remove(`tm-theme-${theme}`);
@@ -16,9 +23,17 @@ function applyDocumentTheme() {
       body.classList.remove('tm-terminal-theme', 'tm-ultra', 'tm-platform-darwin');
     }
 
-    const statusline = document.getElementById('tm-statusline');
-    if (statusline) statusline.remove();
+    const statusline = ensureStatuslineElement();
+    statusline.setAttribute('data-tm-vanilla', 'true');
+    statusline.innerHTML = '';
     return;
+  }
+
+  /* re-establish full statusline content when leaving vanilla mode */
+  const existingStatusline = document.getElementById('tm-statusline');
+  if (existingStatusline?.hasAttribute('data-tm-vanilla')) {
+    existingStatusline.removeAttribute('data-tm-vanilla');
+    existingStatusline.remove();
   }
 
   documentRoot.classList.add('tm-terminal-theme', 'tm-ready');

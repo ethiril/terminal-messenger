@@ -28,15 +28,12 @@ function buildFlagSummary() {
 }
 
 function updateStatuslineContent() {
-  /* in vanilla mode the statusline is removed by applyDocumentTheme; the
-     1Hz clock tick would otherwise re-create it via ensureStatuslineElement
-     a second later. bail before that recreation, and clean up an existing
-     statusline if one snuck through. */
-  if (settings.themeDisabled) {
-    const stale = document.getElementById(STATUSLINE_ELEMENT_ID);
-    if (stale) stale.remove();
-    return;
-  }
+  /* vanilla mode keeps the statusline in the DOM as a 6px transparent
+     drag strip (so the window stays movable - macOS titleBarStyle is
+     'hiddenInset' and there's no other in-page drag handle). don't touch
+     it here: applyDocumentTheme owns the vanilla-mode statusline state,
+     and the 1Hz clock tick has nothing to update when content is empty. */
+  if (settings.themeDisabled) return;
 
   const statusline = ensureStatuslineElement();
   const pathElement = statusline.querySelector('.tm-prompt-path');
