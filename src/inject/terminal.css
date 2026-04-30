@@ -1,4 +1,4 @@
-/* ─── theme palette (defined on :root so overlays outside <body> resolve too) ─── */
+/* :root so overlays rendered outside <body> still resolve the palette */
 :root {
   --tm-bg: #050805;
   --tm-text: #c8e8c0;
@@ -8,7 +8,7 @@
   --tm-font-stack: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   --tm-font-size: 12px;
   --tm-line-height: 1.4;
-  --tm-statusline-height: 18px;
+  --tm-statusline-height: 34px;
 }
 
 html.tm-theme-amber {
@@ -35,7 +35,7 @@ html.tm-theme-mono {
   --tm-dim: #222222;
 }
 
-/* ─── early paint: keep the page black until terminal.js attaches ─── */
+/* hide the page until terminal.js attaches so we never flash unstyled fb */
 html.tm-terminal-theme {
   background: var(--tm-bg) !important;
   color: var(--tm-text) !important;
@@ -57,7 +57,6 @@ html.tm-terminal-theme.tm-ready body {
   visibility: visible;
 }
 
-/* ─── base reset: monospace, no rounding, no animation ─── */
 body.tm-terminal-theme,
 body.tm-terminal-theme *,
 body.tm-terminal-theme *::before,
@@ -97,7 +96,6 @@ html.tm-terminal-theme body * {
   scrollbar-width: thin !important;
 }
 
-/* ─── strip backgrounds and borders site-wide ─── */
 body.tm-terminal-theme div,
 body.tm-terminal-theme span,
 body.tm-terminal-theme section,
@@ -118,7 +116,7 @@ body.tm-terminal-theme [role='tabpanel'] {
   border-color: var(--tm-dim) !important;
 }
 
-/* ─── overlays must stay opaque so underlying chat list does not bleed through ─── */
+/* overlays must stay opaque or the chat list bleeds through */
 body.tm-terminal-theme [role='dialog'],
 body.tm-terminal-theme [role='menu'],
 body.tm-terminal-theme [role='listbox'],
@@ -127,6 +125,28 @@ body.tm-terminal-theme [role='alertdialog'],
 body.tm-terminal-theme [aria-modal='true'] {
   background: var(--tm-bg) !important;
   border: 1px solid var(--tm-dim) !important;
+  padding: 6px 8px !important;
+}
+
+/* the inline reaction picker ("❤️ 😂 😮 😢 😠 👍 +") opens as a tight strip
+   with the global div crush stripping its breathing room - explicit gap +
+   inner padding keeps each emoji separated from the next and from the border */
+body.tm-terminal-theme [role='dialog'][aria-label*='reaction' i],
+body.tm-terminal-theme [role='menu'][aria-label*='reaction' i],
+body.tm-terminal-theme [aria-modal='true'][aria-label*='reaction' i],
+body.tm-terminal-theme [role='dialog'][aria-label*='Reaction' i],
+body.tm-terminal-theme [role='menu'][aria-label*='Reaction' i] {
+  padding: 8px 10px !important;
+  gap: 6px !important;
+  align-items: center !important;
+}
+
+body.tm-terminal-theme [role='dialog'][aria-label*='reaction' i] [role='button'],
+body.tm-terminal-theme [role='menu'][aria-label*='reaction' i] [role='button'],
+body.tm-terminal-theme [role='dialog'][aria-label*='Reaction' i] [role='button'],
+body.tm-terminal-theme [role='menu'][aria-label*='Reaction' i] [role='button'] {
+  padding: 4px !important;
+  margin: 0 2px !important;
 }
 
 body.tm-terminal-theme [role='menu'] *,
@@ -137,10 +157,10 @@ body.tm-terminal-theme [aria-modal='true'] * {
   background-color: transparent !important;
 }
 
-/* dialogs (especially the photo lightbox) need natural flex sizing - the global
-   div crush would otherwise collapse children to 0 dims. */
+/* dialogs need natural sizing - the global div crush would collapse them to 0 */
 body.tm-terminal-theme [role='dialog'] *,
-body.tm-terminal-theme [aria-modal='true'] * {
+body.tm-terminal-theme [aria-modal='true'] *,
+body.tm-terminal-theme dialog * {
   min-height: revert !important;
   padding-top: revert !important;
   margin-top: revert !important;
@@ -175,10 +195,9 @@ body.tm-terminal-theme [role='link'] * {
   text-decoration: none !important;
 }
 
-/* ─── imagery rules ───────────────────────────────────────────────────────────
-   global rule: hide all imagery to keep the chat list, contact rail, headers
-   and chrome strictly text-only. the message log and dialogs override this so
-   message photos, reactions and the lightbox still render. */
+/* ─── imagery ─── */
+
+/* hide all imagery sitewide; specific scopes opt back in below */
 body.tm-terminal-theme img,
 body.tm-terminal-theme picture,
 body.tm-terminal-theme video,
@@ -188,34 +207,62 @@ body.tm-terminal-theme [role='img']:not(svg) {
   display: none !important;
 }
 
-/* re-enable imagery inside the message log + dialog/lightbox */
+/* re-enable inside the log + dialogs + popovers. fb uses
+   <i data-visualcompletion='css-img'> for nearly every interactive icon, so
+   without this the React/More/Reply buttons render empty. */
 body.tm-terminal-theme [role='log'] img,
 body.tm-terminal-theme [role='log'] picture,
 body.tm-terminal-theme [role='log'] video,
 body.tm-terminal-theme [role='log'] canvas,
+body.tm-terminal-theme [role='log'] i[data-visualcompletion='css-img'],
 body.tm-terminal-theme [data-tm-thread] img,
 body.tm-terminal-theme [data-tm-thread] picture,
 body.tm-terminal-theme [data-tm-thread] video,
 body.tm-terminal-theme [data-tm-thread] canvas,
+body.tm-terminal-theme [data-tm-thread] i[data-visualcompletion='css-img'],
 body.tm-terminal-theme [role='dialog'] img,
 body.tm-terminal-theme [role='dialog'] picture,
 body.tm-terminal-theme [role='dialog'] video,
 body.tm-terminal-theme [role='dialog'] canvas,
 body.tm-terminal-theme [role='dialog'] i[data-visualcompletion='css-img'],
+body.tm-terminal-theme [role='menu'] img,
+body.tm-terminal-theme [role='menu'] i[data-visualcompletion='css-img'],
+body.tm-terminal-theme [role='tooltip'] img,
+body.tm-terminal-theme [role='tooltip'] i[data-visualcompletion='css-img'],
 body.tm-terminal-theme [aria-modal='true'] img,
 body.tm-terminal-theme [aria-modal='true'] picture,
 body.tm-terminal-theme [aria-modal='true'] video,
 body.tm-terminal-theme [aria-modal='true'] canvas,
-body.tm-terminal-theme [aria-modal='true'] i[data-visualcompletion='css-img'] {
+body.tm-terminal-theme [aria-modal='true'] i[data-visualcompletion='css-img'],
+body.tm-terminal-theme dialog img,
+body.tm-terminal-theme dialog picture,
+body.tm-terminal-theme dialog video,
+body.tm-terminal-theme dialog canvas,
+body.tm-terminal-theme dialog i[data-visualcompletion='css-img'],
+/* chat-list grid is JS-tagged exactly. previously scoped via
+   [role='grid']:not([role='log']) but the descendant combinator reaches into
+   log rows when fb wraps the log inside another grid - that bug rendered
+   message timestamps as 18×18 squares with text wrapping vertically. */
+body.tm-terminal-theme [data-tm-chat-list] img,
+body.tm-terminal-theme [data-tm-chat-list] picture,
+body.tm-terminal-theme [data-tm-chat-list] i[data-visualcompletion='css-img'] {
   display: revert !important;
 }
 
-/* allow background-image inside dialogs, popovers and emoji-bearing nodes only.
-   we used to revert background-image across the entire message log, but that
-   also re-enabled facebook's gradient bubble backgrounds (the bubble around a
-   photo / link-card was painting a dim-green block behind the media). target
-   the specific elements that legitimately need bg-image: emoji/sticker tiles
-   and reaction badges. message-log gradients stay killed. */
+/* fb's native search dropdown renders chat results outside the
+   [data-tm-chat-list] grid, so chat-list avatar circles and masking don't
+   reach them - the avatars come through as natural-size square thumbnails.
+   chrome-tagging.js tags the dropdown; suppress its imagery here. */
+body.tm-terminal-theme [data-tm-search-results] img,
+body.tm-terminal-theme [data-tm-search-results] picture,
+body.tm-terminal-theme [data-tm-search-results] i[data-visualcompletion='css-img'],
+body.tm-terminal-theme [data-tm-search-results] svg {
+  display: none !important;
+}
+
+/* allow background-image for emoji/sticker tiles, reaction badges, dialogs,
+   and chat-list default-avatar circles. NOT for the log generally - that
+   re-enabled fb's gradient bubble backgrounds behind photos/link-cards. */
 body.tm-terminal-theme [role='dialog'] *,
 body.tm-terminal-theme [aria-modal='true'] *,
 body.tm-terminal-theme [role='menu'] *,
@@ -229,7 +276,8 @@ body.tm-terminal-theme [role='log'] [aria-label*='Reactions' i] *,
 body.tm-terminal-theme [data-tm-thread] [aria-label*='reaction' i],
 body.tm-terminal-theme [data-tm-thread] [aria-label*='reaction' i] *,
 body.tm-terminal-theme [data-tm-thread] [aria-label*='Reactions' i],
-body.tm-terminal-theme [data-tm-thread] [aria-label*='Reactions' i] * {
+body.tm-terminal-theme [data-tm-thread] [aria-label*='Reactions' i] *,
+body.tm-terminal-theme [data-tm-chat-list] i[data-visualcompletion='css-img'] {
   background-image: revert !important;
 }
 
@@ -266,9 +314,8 @@ body.tm-terminal-theme [aria-pressed='true'] svg * {
   opacity: 1 !important;
 }
 
-/* large message media: cap and let auto-sizing preserve aspect ratio. width/height
-   auto only applies once the image has been measured + tagged 'large' - applying
-   them to untagged imgs would balloon retina-served avatars to natural resolution. */
+/* width/height auto only after the image was measured + tagged, otherwise
+   retina-served avatars balloon to natural resolution */
 body.tm-terminal-theme [role='log'] img[data-tm-img-size='large'],
 body.tm-terminal-theme [data-tm-thread] img[data-tm-img-size='large'],
 body.tm-terminal-theme [role='log'] video,
@@ -284,8 +331,6 @@ body.tm-terminal-theme [data-tm-thread] canvas {
   object-fit: contain !important;
 }
 
-/* not-yet-tagged log images keep their natural html dims so loading layouts
-   don't balloon. just cap upper bound + preserve aspect via object-fit. */
 body.tm-terminal-theme [role='log'] img:not([data-tm-img-size]),
 body.tm-terminal-theme [data-tm-thread] img:not([data-tm-img-size]) {
   max-width: 480px !important;
@@ -293,9 +338,6 @@ body.tm-terminal-theme [data-tm-thread] img:not([data-tm-img-size]) {
   object-fit: contain !important;
 }
 
-/* tagged-small avatars / read-receipts: tiny round badge that sits inline with
-   the text baseline so it visually anchors to the message. align-self:center
-   so it also centers when the parent is a flex container (fb often is). */
 body.tm-terminal-theme [role='log'] img[data-tm-img-size='small'] {
   width: 12px !important;
   height: 12px !important;
@@ -310,21 +352,77 @@ body.tm-terminal-theme [role='log'] img[data-tm-img-size='small'] {
   opacity: 0.6 !important;
 }
 
-/* if the small badge sits in a wrapper, center the wrapper too so the badge
-   doesn't get pushed to the top of a flex row. */
+body.tm-terminal-theme [data-tm-chat-list] img,
+body.tm-terminal-theme [data-tm-chat-list] picture,
+body.tm-terminal-theme [data-tm-chat-list] i[data-visualcompletion='css-img'] {
+  width: 18px !important;
+  height: 18px !important;
+  max-width: 18px !important;
+  max-height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  border-radius: 50% !important;
+  border: 1px solid var(--tm-dim) !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  align-self: center !important;
+  margin: 0 4px 0 0 !important;
+  opacity: 0.7 !important;
+  object-fit: cover !important;
+  background-size: cover !important;
+  background-position: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* fb wraps avatars in an <svg> with a circular <mask>; the global svg crush
+   to 14×14 turned that mask into a 14px viewport over the 18px avatar, so
+   only a few pixels of the avatar peeked through the top. let chat-list svgs
+   size to the avatar and stop hiding their painted descendants. */
+body.tm-terminal-theme [data-tm-chat-list] svg,
+body.tm-terminal-theme [data-tm-chat-list] svg * {
+  width: 18px !important;
+  height: 18px !important;
+  max-width: 18px !important;
+  max-height: 18px !important;
+  overflow: visible !important;
+  fill: revert !important;
+  stroke: revert !important;
+  color: revert !important;
+  opacity: revert !important;
+}
+
+/* avatar wrappers inside chat-list rows must stay tall enough for the 18px
+   circle - the global div crush (min-height: 0) was collapsing them */
+body.tm-terminal-theme [data-tm-chat-list] [role='row'] *:has(> img),
+body.tm-terminal-theme [data-tm-chat-list] [role='row'] *:has(> picture),
+body.tm-terminal-theme [data-tm-chat-list] [role='row'] *:has(> svg),
+body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] *:has(> img),
+body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] *:has(> picture),
+body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] *:has(> svg) {
+  min-width: 20px !important;
+  min-height: 20px !important;
+  overflow: visible !important;
+  align-items: center !important;
+}
+
+/* center wrappers around small badges so the badge doesn't push to the top
+   of a flex row */
 body.tm-terminal-theme [role='log'] *:has(> img[data-tm-img-size='small']) {
   align-self: center !important;
   align-items: center !important;
 }
 
-/* image lightbox: full size, neutralise transforms/filters that may hide it.
-   also force natural width/height auto so a 0-sized fade-in target renders. */
+/* clear half-applied transforms/filters left over after the open animation
+   was stripped by our universal `transition: none` */
 body.tm-terminal-theme [role='dialog'] img,
 body.tm-terminal-theme [role='dialog'] video,
 body.tm-terminal-theme [role='dialog'] canvas,
 body.tm-terminal-theme [aria-modal='true'] img,
 body.tm-terminal-theme [aria-modal='true'] video,
-body.tm-terminal-theme [aria-modal='true'] canvas {
+body.tm-terminal-theme [aria-modal='true'] canvas,
+body.tm-terminal-theme dialog img,
+body.tm-terminal-theme dialog video,
+body.tm-terminal-theme dialog canvas {
   width: auto !important;
   height: auto !important;
   max-width: 90vw !important;
@@ -345,7 +443,8 @@ body.tm-terminal-theme [data-tm-thread] svg {
   max-height: 16px !important;
 }
 
-/* ─── hide facebook chrome ─── */
+/* ─── hide fb chrome ─── */
+
 body.tm-terminal-theme [role='banner'],
 body.tm-terminal-theme [aria-label='Stories'],
 body.tm-terminal-theme [aria-label='Watch'],
@@ -368,17 +467,12 @@ body.tm-terminal-theme [role='main'] {
   gap: 0 !important;
 }
 
-/* ─── chat header ───
-   the chat-header (avatar | name | active status | call buttons) is redundant
-   - the statusline already shows ~/messenger/<name> · <presence>. drop it
-   completely so the message log can use its full vertical space. */
-body.tm-terminal-theme [data-tm-chat-header] {
+/* chat-header is redundant - statusline already shows ~/messenger/<name> · presence */
+body.tm-terminal-theme [data-tm-chat-header],
+body.tm-terminal-theme [data-tm-thread-intro] {
   display: none !important;
 }
 
-/* ─── collapse dead vertical space left behind by hidden facebook chrome ───
-   universal crush of div/section padding-top + margin-top. body padding-top
-   is restored above so the statusline still has its 18px reserved strip. */
 body.tm-terminal-theme div,
 body.tm-terminal-theme section,
 body.tm-terminal-theme main,
@@ -398,7 +492,6 @@ body.tm-terminal-theme [role='main'] [role='heading'] {
   font-size: 12px !important;
 }
 
-/* ─── make sure leftover left-rail slivers are gone ─── */
 body.tm-terminal-theme [role='navigation'][aria-label='Shortcuts'],
 body.tm-terminal-theme [role='navigation'][aria-label*='Main'],
 body.tm-terminal-theme [data-pagelet='LeftRail'] *,
@@ -407,7 +500,6 @@ body.tm-terminal-theme [data-pagelet='RightRail'] {
   display: none !important;
 }
 
-/* ─── tab strip (All / Unread / Groups / Communities) stays on one line ─── */
 body.tm-terminal-theme [role='tablist'] {
   display: flex !important;
   flex-wrap: nowrap !important;
@@ -426,7 +518,6 @@ body.tm-terminal-theme [role='tab'] {
   font-size: 11px !important;
 }
 
-/* ─── tighten chat list rows ─── */
 body.tm-terminal-theme [role='row'],
 body.tm-terminal-theme [role='gridcell'],
 body.tm-terminal-theme [role='listitem'] {
@@ -437,18 +528,48 @@ body.tm-terminal-theme [role='listitem'] {
   line-height: 1.25 !important;
 }
 
-/* crush descendant padding/margin in side panels (chat list, contacts).
-   the message log overrides this further down so its bubbles still breathe. */
+/* tight chat-list rows. scope must avoid the message log: previously included
+   [role='grid']:not([role='log']) but the descendant combinator reached into
+   log rows when fb wrapped the log in another grid */
 body.tm-terminal-theme [role='complementary'] [role='row'] *,
 body.tm-terminal-theme [role='complementary'] [role='listitem'] *,
 body.tm-terminal-theme [role='complementary'] [role='gridcell'] *,
-body.tm-terminal-theme [role='grid']:not([role='log']) [role='row'] *,
-body.tm-terminal-theme [role='grid']:not([role='log']) [role='gridcell'] * {
+body.tm-terminal-theme [data-tm-chat-list] [role='row'] *,
+body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] *,
+body.tm-terminal-theme [data-tm-chat-list] [role='listitem'] * {
   margin-top: 0 !important;
   margin-bottom: 0 !important;
   padding-top: 1px !important;
   padding-bottom: 1px !important;
   min-height: unset !important;
+}
+
+/* the global row rule above zeros vertical padding, which clips ascenders
+   at the top of chat-list names and lets hover-action buttons appear taller
+   than the row, so the row visibly grows when the cursor passes through.
+   restore vertical breathing room here, scoped to chat-list / search rows. */
+body.tm-terminal-theme [data-tm-chat-list] [role='row'],
+body.tm-terminal-theme [data-tm-chat-list] [role='listitem'],
+body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'],
+body.tm-terminal-theme [data-tm-search-results] [role='row'],
+body.tm-terminal-theme [data-tm-search-results] [role='listitem'],
+body.tm-terminal-theme [data-tm-search-results] a[role='link'] {
+  padding: 6px 8px !important;
+}
+
+/* hover-action buttons (Pin, Mark unread, More) default to fb's touch-target
+   size and were forcing the row taller on hover. cap them to fit alongside
+   the row's text without resizing it. exclude the row's primary anchor
+   (which is also a role='link') so we don't crush the click-target itself. */
+body.tm-terminal-theme [data-tm-chat-list] [role='row'] [role='button'],
+body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] [role='button'],
+body.tm-terminal-theme [data-tm-chat-list] [role='row'] button,
+body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] button {
+  min-height: unset !important;
+  height: 20px !important;
+  padding: 0 4px !important;
+  flex-shrink: 0 !important;
+  align-self: center !important;
 }
 
 body.tm-terminal-theme [role='row']:hover,
@@ -467,12 +588,8 @@ body.tm-terminal-theme [role='tab'][aria-selected='true'] {
   padding-left: 4px !important;
 }
 
-/* selected-state highlight should not bleed into individual messages or hover
-   the log. extended to cover gridcell/link/button hovers inside the log too -
-   facebook wraps message bubbles (especially photo/link-preview bubbles) in
-   [role='button'] for accessibility, and the global [role='button']:hover
-   rule above would otherwise paint a tm-dim block around the image bubble
-   even though the row itself stays transparent. */
+/* fb wraps photo/link bubbles in role=button; without this override the
+   global :hover would paint a tm-dim block around them */
 body.tm-terminal-theme [role='log'] [aria-selected='true'],
 body.tm-terminal-theme [role='log']:hover,
 body.tm-terminal-theme [role='log'] [role='row']:hover,
@@ -488,7 +605,7 @@ body.tm-terminal-theme [data-tm-thread] a[role='link']:hover {
   padding-left: 0 !important;
 }
 
-/* ─── message log (the conversation pane) ─── */
+/* ─── message log ─── */
 
 body.tm-terminal-theme [role='log'] *,
 body.tm-terminal-theme [aria-label*='Messages in conversation'] *,
@@ -497,8 +614,6 @@ body.tm-terminal-theme [data-tm-thread] * {
   border-color: transparent !important;
 }
 
-/* breathing room top + bottom of the scrollable log so the first/last visible
-   message never sits flush against the clipping edge. */
 body.tm-terminal-theme [role='log'],
 body.tm-terminal-theme [data-tm-thread] {
   padding-top: 14px !important;
@@ -509,23 +624,25 @@ body.tm-terminal-theme [data-tm-thread] {
   overflow-x: hidden !important;
 }
 
-/* every container inside the log keeps overflow visible so no parent clips
-   the row content (this fixes the "first message has its top half clipped"
-   issue caused by ancestors with overflow:hidden + small explicit heights). */
+/* ancestors with overflow:hidden + small explicit heights were clipping the
+   first message's top half */
 body.tm-terminal-theme [role='log'] > *,
 body.tm-terminal-theme [data-tm-thread] > * {
   overflow: visible !important;
   max-height: none !important;
 }
 
+/* symmetric horizontal padding reserves space for the hover toolbar on
+   either side of the bubble (incoming → right, outgoing → left) so it
+   never pushes message text on hover. extra vertical padding gives ascenders
+   breathing room - tighter padding clipped the top of capital letters
+   because parent containers were occasionally constraining the row's height. */
 body.tm-terminal-theme [role='log'] [role='row'],
 body.tm-terminal-theme [aria-label*='Messages in conversation'] [role='row'] {
-  /* right-side padding reserves space for the hover toolbar so its appearance
-     doesn't push message text around when the row is hovered. */
-  padding: 4px 84px 4px 8px !important;
+  padding: 14px 84px 10px !important;
   display: block !important;
   position: relative !important;
-  line-height: var(--tm-line-height) !important;
+  line-height: 1.5 !important;
   overflow: visible !important;
   height: auto !important;
   min-height: 0 !important;
@@ -538,80 +655,104 @@ body.tm-terminal-theme [role='log'] [role='row'] * {
   max-height: none !important;
 }
 
-/* hover toolbar (more / react / reply / forward) appears next to the bubble.
-   pin every variant absolutely so it floats over the reserved right-side padding
-   instead of pushing text vertically when the row is hovered.
+/* tagged in JS via [data-tm-action-button] - matching in CSS via aria-label
+   would either include reaction badges (Reactions / Like reaction) or, if
+   excluded on "reaction", drop fb's React button (aria-label "Send a
+   reaction") and leave it inline shaking the row on hover.
 
-   the :not([aria-label*='reaction' i]) is critical: facebook also renders
-   reaction badges (e.g. aria-label="Reactions" or "Like reaction") which would
-   match [aria-label*='React' i] and get teleported on top of the row, hiding
-   them. excluding 'reaction' keeps the action button rule from clobbering the
-   reaction badges that sit visibly under message bubbles. */
-body.tm-terminal-theme [role='log'] [role='row'] [role='button'][aria-label*='More' i]:not([aria-label*='reaction' i]),
-body.tm-terminal-theme [role='log'] [role='row'] [role='button'][aria-label*='React' i]:not([aria-label*='reaction' i]),
-body.tm-terminal-theme [role='log'] [role='row'] [role='button'][aria-label*='Reply' i]:not([aria-label*='reaction' i]),
-body.tm-terminal-theme [role='log'] [role='row'] [role='button'][aria-label*='Forward' i]:not([aria-label*='reaction' i]),
-body.tm-terminal-theme [role='log'] [role='row'] button[aria-label*='More' i]:not([aria-label*='reaction' i]),
-body.tm-terminal-theme [role='log'] [role='row'] button[aria-label*='React' i]:not([aria-label*='reaction' i]),
-body.tm-terminal-theme [role='log'] [role='row'] button[aria-label*='Reply' i]:not([aria-label*='reaction' i]),
-body.tm-terminal-theme [role='log'] [role='row'] button[aria-label*='Forward' i]:not([aria-label*='reaction' i]),
-body.tm-terminal-theme [role='log'] [role='row'] [aria-label='Message actions'] {
-  position: absolute !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  z-index: 5 !important;
-  margin: 0 !important;
-}
-
-body.tm-terminal-theme [role='log'] [role='row'] [role='button'][aria-label*='More' i]:not([aria-label*='reaction' i]),
-body.tm-terminal-theme [role='log'] [role='row'] button[aria-label*='More' i]:not([aria-label*='reaction' i]) {
-  right: 4px !important;
-}
-body.tm-terminal-theme [role='log'] [role='row'] [role='button'][aria-label*='React' i]:not([aria-label*='reaction' i]),
-body.tm-terminal-theme [role='log'] [role='row'] button[aria-label*='React' i]:not([aria-label*='reaction' i]) {
-  right: 26px !important;
-}
-body.tm-terminal-theme [role='log'] [role='row'] [role='button'][aria-label*='Reply' i]:not([aria-label*='reaction' i]),
-body.tm-terminal-theme [role='log'] [role='row'] button[aria-label*='Reply' i]:not([aria-label*='reaction' i]) {
-  right: 48px !important;
-}
-body.tm-terminal-theme [role='log'] [role='row'] [role='button'][aria-label*='Forward' i]:not([aria-label*='reaction' i]),
-body.tm-terminal-theme [role='log'] [role='row'] button[aria-label*='Forward' i]:not([aria-label*='reaction' i]) {
-  right: 70px !important;
-}
-
-/* if fb wraps the action buttons in a flex container, pin the wrapper. tag the
-   wrapper from JS only when we know its children are real action buttons -
-   doing this in pure CSS via :has() risks matching wrappers that contain
-   reaction badges (which would absolute-position the badges out of view). */
-body.tm-terminal-theme [role='log'] [role='row'] [data-tm-action-toolbar] {
+   the toolbar wrapper is the only absolutely positioned element; buttons
+   inside flow as static flex children. previously each button ALSO carried
+   its own position: absolute with right:4/26/48/70px - inside an absolutely
+   positioned wrapper of width 0 they all collapsed onto the same point and
+   rendered as a vertical stack with their text labels wrapping one char per
+   line. */
+body.tm-terminal-theme [role='log'] [role='row'] [data-tm-action-toolbar],
+body.tm-terminal-theme [data-tm-thread] [role='row'] [data-tm-action-toolbar] {
   position: absolute !important;
   top: 50% !important;
   right: 4px !important;
+  left: auto !important;
   transform: translateY(-50%) !important;
-  z-index: 5 !important;
+  z-index: 50 !important;
   margin: 0 !important;
   padding: 0 !important;
+  width: auto !important;
   height: auto !important;
   display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
   gap: 4px !important;
+  white-space: nowrap !important;
 }
 
-/* reply quotes: dim the entire reply preview block (the "X replied to you"
-   hint plus the quoted source bubble) so the new typed reply visually stands
-   out. tagged in js as [data-tm-reply-quote]. */
-body.tm-terminal-theme [data-tm-reply-quote],
-body.tm-terminal-theme [data-tm-reply-quote] *,
-body.tm-terminal-theme [data-tm-reply-quote] span,
-body.tm-terminal-theme [data-tm-reply-quote] div,
-body.tm-terminal-theme [data-tm-reply-quote] a {
-  color: var(--tm-muted) !important;
+body.tm-terminal-theme [role='log'] [role='row'][data-tm-direction='out'] [data-tm-action-toolbar],
+body.tm-terminal-theme [data-tm-thread] [role='row'][data-tm-direction='out'] [data-tm-action-toolbar] {
+  left: 4px !important;
+  right: auto !important;
+}
+
+body.tm-terminal-theme [role='log'] [role='row'] [data-tm-action-button],
+body.tm-terminal-theme [data-tm-thread] [role='row'] [data-tm-action-button] {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  width: 22px !important;
+  height: 22px !important;
+  flex-shrink: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  /* nuke any visible text label ("Reply", "React") fb renders alongside the
+     icon - aria-label is still there for screen readers */
+  font-size: 0 !important;
+  line-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+body.tm-terminal-theme [role='log'] [role='row'] [data-tm-action-button] svg,
+body.tm-terminal-theme [role='log'] [role='row'] [data-tm-action-button] i,
+body.tm-terminal-theme [data-tm-thread] [role='row'] [data-tm-action-button] svg,
+body.tm-terminal-theme [data-tm-thread] [role='row'] [data-tm-action-button] i {
+  font-size: 14px !important;
+  line-height: 1 !important;
+}
+
+/* fb injects timestamp + label tooltips on row hover and they're often
+   portalled outside the row to the document body, where they ended up as a
+   narrow vertical column of characters next to the bubble (the "Reply"
+   stacked R/e/p/l/y artifact). hide tooltips entirely; aria-label still
+   exposes the action name to assistive tech. */
+body.tm-terminal-theme [role='tooltip'] {
+  display: none !important;
+}
+
+/* doubled body class boosts specificity above the [data-tm-direction='in/out']
+   color rules later in this file so reply quotes always read as dim. the
+   left border + indent is the visual anchor when fb's color overrides slip
+   through and the muted-text alone isn't readable as "this was quoted". */
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] {
+  display: block !important;
+  border-left: 2px solid var(--tm-muted) !important;
+  padding: 1px 0 1px 8px !important;
+  margin: 2px 0 !important;
   opacity: 0.55 !important;
+}
+
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote],
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] *,
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] span,
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] div,
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] a {
+  color: var(--tm-muted) !important;
   font-style: italic !important;
 }
 
-/* reactions sit in their own little badge container under message bubbles.
-   they're often <img>/svg/text below the bubble - keep them visible and small. */
 body.tm-terminal-theme [role='log'] [aria-label*='reaction' i],
 body.tm-terminal-theme [role='log'] [aria-label*='Reactions' i] {
   display: inline-flex !important;
@@ -633,7 +774,30 @@ body.tm-terminal-theme [role='log'] [aria-label*='Reactions' i] svg {
   max-height: 14px !important;
 }
 
+/* swap fb's animated three-dot typing bubble for a literal "..." string -
+   the original svg dots got crushed into a single lime swirl by our global
+   svg sizing, so just hide every visual descendant and render text via ::after */
+body.tm-terminal-theme [data-tm-typing-indicator] > * {
+  display: none !important;
+}
+
+body.tm-terminal-theme [data-tm-typing-indicator] {
+  display: block !important;
+  padding: 4px 0 !important;
+  font-size: var(--tm-font-size) !important;
+  color: var(--tm-muted) !important;
+  opacity: 0.8 !important;
+  font-style: italic !important;
+}
+
+body.tm-terminal-theme [data-tm-typing-indicator]::after {
+  content: '. . .';
+  letter-spacing: 2px;
+  color: var(--tm-muted) !important;
+}
+
 /* ─── inputs ─── */
+
 body.tm-terminal-theme input,
 body.tm-terminal-theme textarea,
 body.tm-terminal-theme [contenteditable='true'],
@@ -664,7 +828,8 @@ body.tm-terminal-theme input[type='email'] {
   user-select: text !important;
 }
 
-/* ─── scrollbars (themed for the entire window, not just body descendants) ─── */
+/* ─── scrollbars (whole window, not just body descendants) ─── */
+
 html.tm-terminal-theme ::-webkit-scrollbar,
 html.tm-terminal-theme::-webkit-scrollbar {
   width: 6px !important;
@@ -689,7 +854,8 @@ html.tm-terminal-theme::-webkit-scrollbar-corner {
   background: var(--tm-bg) !important;
 }
 
-/* ─── status line (zsh-style prompt fixed at top) ─── */
+/* ─── statusline ─── */
+
 #tm-statusline {
   position: fixed;
   top: 0;
@@ -708,45 +874,28 @@ html.tm-terminal-theme::-webkit-scrollbar-corner {
   font-size: 10px;
   pointer-events: none;
   user-select: none;
+  /* drag-handle for moving the window after we drop the macOS title bar */
+  -webkit-app-region: drag;
 }
 
-#tm-statusline .tm-prompt-arrow {
-  color: var(--tm-accent) !important;
+/* leave room on the left for the macOS traffic-light buttons. selector matches
+   <html> because #tm-statusline is appended to documentElement (so a body-scoped
+   selector never reaches it). */
+html.tm-platform-darwin #tm-statusline {
+  padding-left: 84px !important;
 }
 
-#tm-statusline .tm-prompt-path {
-  color: var(--tm-text) !important;
-}
-
-#tm-statusline .tm-prompt-presence {
-  color: var(--tm-accent) !important;
-  opacity: 0.85;
-}
-
-#tm-statusline .tm-prompt-presence:empty {
-  display: none;
-}
-
-#tm-statusline .tm-prompt-flags {
-  color: var(--tm-accent) !important;
-  opacity: 0.7;
-}
-
-#tm-statusline .tm-prompt-flags:empty {
-  display: none;
-}
-
-#tm-statusline .tm-prompt-clock {
-  color: var(--tm-muted) !important;
-  margin-left: auto;
-}
-
-#tm-statusline .tm-prompt-hint {
-  color: var(--tm-muted) !important;
-  opacity: 0.8;
-}
+#tm-statusline .tm-prompt-arrow   { color: var(--tm-accent) !important; }
+#tm-statusline .tm-prompt-path    { color: var(--tm-text) !important; }
+#tm-statusline .tm-prompt-presence { color: var(--tm-accent) !important; opacity: 0.85; }
+#tm-statusline .tm-prompt-presence:empty { display: none; }
+#tm-statusline .tm-prompt-flags   { color: var(--tm-accent) !important; opacity: 0.7; }
+#tm-statusline .tm-prompt-flags:empty { display: none; }
+#tm-statusline .tm-prompt-clock   { color: var(--tm-muted) !important; margin-left: auto; }
+#tm-statusline .tm-prompt-hint    { color: var(--tm-muted) !important; opacity: 0.8; }
 
 /* ─── command palette ─── */
+
 #tm-command-root {
   position: fixed;
   inset: 0;
@@ -777,7 +926,6 @@ html.tm-terminal-theme::-webkit-scrollbar-corner {
   color: var(--tm-text) !important;
   border: 1px solid var(--tm-dim);
   padding: 8px 10px;
-  /* belt-and-suspenders: even if the body reset wins specificity, force opacity */
   opacity: 1 !important;
 }
 
@@ -827,6 +975,7 @@ html.tm-terminal-theme::-webkit-scrollbar-corner {
 }
 
 /* ─── search overlay (Cmd+Shift+S) ─── */
+
 #tm-search-root {
   position: fixed;
   inset: 0;
@@ -918,7 +1067,94 @@ html.tm-terminal-theme::-webkit-scrollbar-corner {
   cursor: default;
 }
 
+/* ─── media viewer (replaces fb's image lightbox) ─── */
+
+/* appended to documentElement so body-scoped rules don't crush it */
+#tm-media-viewer-root {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  pointer-events: none;
+  display: none;
+  font-family: var(--tm-font-stack);
+}
+
+#tm-media-viewer-root.tm-media-viewer-open {
+  display: block;
+  pointer-events: auto;
+}
+
+#tm-media-viewer-root .tm-media-viewer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92) !important;
+}
+
+#tm-media-viewer-root .tm-media-viewer-frame {
+  position: absolute;
+  inset: 8px;
+  display: flex;
+  flex-direction: column;
+  background: var(--tm-bg) !important;
+  border: 1px solid var(--tm-dim);
+}
+
+#tm-media-viewer-root .tm-media-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--tm-dim);
+  font-size: 11px;
+  color: var(--tm-muted) !important;
+  flex: 0 0 auto;
+}
+
+#tm-media-viewer-root .tm-media-viewer-title {
+  color: var(--tm-text) !important;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 80%;
+}
+
+#tm-media-viewer-root .tm-media-viewer-close {
+  background: transparent !important;
+  color: var(--tm-accent) !important;
+  border: 1px solid var(--tm-dim);
+  cursor: pointer;
+  font-family: var(--tm-font-stack);
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
+#tm-media-viewer-root .tm-media-viewer-close:hover {
+  border-color: var(--tm-accent);
+}
+
+#tm-media-viewer-root .tm-media-viewer-body {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 16px;
+  min-height: 0;
+}
+
+#tm-media-viewer-root .tm-media-viewer-img {
+  max-width: 100% !important;
+  max-height: 100% !important;
+  width: auto !important;
+  height: auto !important;
+  display: block !important;
+  object-fit: contain;
+  border: 1px solid var(--tm-dim);
+}
+
 /* ─── toast ─── */
+
 #tm-toast {
   position: fixed;
   right: 8px;
@@ -938,12 +1174,11 @@ html.tm-terminal-theme::-webkit-scrollbar-corner {
   opacity: 1;
 }
 
-/* ─── ultra mode: chat-only fullscreen ───
-   we used to hide bare `aside` and `[role='complementary']` here, but facebook
-   wraps inline link previews / share cards in those exact elements *inside*
-   the message log - so a blanket hide ate every link-card render in ultra
-   mode. constrain those broad role hides to elements that are NOT inside the
-   message log / dialog so previews keep rendering. */
+/* ─── ultra mode: chat-only fullscreen ─── */
+
+/* fb wraps inline link previews / share cards in `aside`/[role='complementary']
+   *inside* the message log, so a blanket hide eats every link-card render.
+   constrain the broad role hides to elements that are NOT inside the log */
 body.tm-ultra [role='banner'],
 body.tm-ultra [role='navigation']:not([role='log'] [role='navigation']):not([data-tm-thread] [role='navigation']),
 body.tm-ultra [role='complementary']:not([role='log'] [role='complementary']):not([data-tm-thread] [role='complementary']):not([role='dialog'] [role='complementary']),
@@ -955,14 +1190,7 @@ body.tm-ultra [data-pagelet*='ChatTab'],
 body.tm-ultra [data-pagelet*='Chats'],
 body.tm-ultra [role='main'] [role='button'][aria-label*='call'],
 body.tm-ultra [role='main'] [role='button'][aria-label*='Conversation information'],
-body.tm-ultra [role='main'] [role='button'][aria-label*='Show details'],
-body.tm-ultra [role='main'] [aria-label*='Choose a sticker'],
-body.tm-ultra [role='main'] [aria-label*='Send a GIF'],
-body.tm-ultra [role='main'] [aria-label*='Voice message'],
-body.tm-ultra [role='main'] [aria-label*='Open emoji'],
-body.tm-ultra [role='main'] [aria-label*='Send like'],
-body.tm-ultra [role='main'] [aria-label*='Camera'],
-body.tm-ultra [role='main'] [aria-label*='Attach'] {
+body.tm-ultra [role='main'] [role='button'][aria-label*='Show details'] {
   display: none !important;
 }
 
@@ -972,9 +1200,6 @@ body.tm-ultra [role='main'] {
   flex: 1 1 100% !important;
 }
 
-/* tagged in JS: the log + composer container get fixed-fullscreen positioning so
-   nothing else can take up real estate even if FB still renders it. the chat
-   header is hidden globally so the log can sit right under the statusline. */
 body.tm-ultra [data-tm-ultra-log] {
   position: fixed !important;
   top: var(--tm-statusline-height) !important;
@@ -999,13 +1224,18 @@ body.tm-ultra [data-tm-ultra-composer] {
 }
 
 body.tm-ultra [role='log'] [role='row'] {
-  padding: 2px 6px !important;
+  padding: 5px 84px !important;
   line-height: 1.3 !important;
 }
 
-body.tm-ultra [role='log'] [role='row'] * {
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
+/* JS-tagged so plain inline anchors don't get a frame */
+body.tm-terminal-theme [role='log'] [data-tm-link-preview],
+body.tm-terminal-theme [data-tm-thread] [data-tm-link-preview] {
+  display: inline-block !important;
+  border: 1px solid var(--tm-dim) !important;
+  padding: 4px 6px !important;
+  margin: 4px 0 !important;
+  max-width: 480px !important;
 }
 
 body.tm-ultra [role='log'] img[data-tm-img-size='large'],
@@ -1017,7 +1247,6 @@ body.tm-ultra [role='log'] video {
   object-fit: contain !important;
 }
 
-/* direction-coded message colors (only meaningful with tm-ultra). */
 body.tm-terminal-theme [data-tm-direction='out'],
 body.tm-terminal-theme [data-tm-direction='out'] *,
 body.tm-terminal-theme [data-tm-direction='out'] span,
@@ -1032,7 +1261,7 @@ body.tm-terminal-theme [data-tm-direction='in'] div {
   color: var(--tm-text) !important;
 }
 
-/* in non-ultra modes, keep messages neutral so the colors don't fight the theme */
+/* keep messages neutral outside ultra so the colors don't fight the theme */
 body.tm-terminal-theme:not(.tm-ultra) [data-tm-direction='out'],
 body.tm-terminal-theme:not(.tm-ultra) [data-tm-direction='out'] *,
 body.tm-terminal-theme:not(.tm-ultra) [data-tm-direction='in'],
@@ -1041,7 +1270,8 @@ body.tm-terminal-theme:not(.tm-ultra) [data-tm-direction='in'] * {
 }
 
 /* reply-quote dim wins over direction colors */
-body.tm-terminal-theme [data-tm-reply-quote],
-body.tm-terminal-theme [data-tm-reply-quote] * {
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote],
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] * {
   color: var(--tm-muted) !important;
+  font-style: italic !important;
 }

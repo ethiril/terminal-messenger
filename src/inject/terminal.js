@@ -69,6 +69,7 @@ function start() {
   applyWindowOpacity(settings.opacityPct);
   applyWindowMuted(settings.muted);
   bindKeyboardShortcuts();
+  bindMediaViewerEvents();
   startMutationObserver();
   startStatuslineClock();
 }

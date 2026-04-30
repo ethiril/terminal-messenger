@@ -10,13 +10,10 @@ function appendSearchHintRow(resultsElement, hintMessage) {
   resultsElement.appendChild(hintItem);
 }
 
+/* a single chat-list row often contains a nested link, so SEARCHABLE_ROW_SELECTOR
+   yields the same chat twice. dedupe by label and keep the deepest match - that's
+   the one whose click navigates correctly. */
 function findChatMatchesForQuery(lowercaseQuery) {
-  /* SEARCHABLE_ROW_SELECTOR matches [role="row"], [role="listitem"] and
-     a[role="link"]. a single chat list row often contains a nested link
-     element, so the same chat shows up twice (once for the row, once for the
-     link). dedupe by normalised label and skip ancestors whose descendant we
-     already accepted - keep the deepest match because it's the one that
-     navigates correctly when clicked. */
   const matches = [];
   const seenLabels = new Set();
   const candidateRows = document.querySelectorAll(SEARCHABLE_ROW_SELECTOR);

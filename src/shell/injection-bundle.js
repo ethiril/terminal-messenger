@@ -4,14 +4,19 @@ const { readTextFileOrNull, isAllowedMessengerUrl } = require('./app-config');
 const TERMINAL_INJECT_DIRECTORY = path.join(__dirname, '..', 'inject');
 const TERMINAL_CSS_PATH = path.join(TERMINAL_INJECT_DIRECTORY, 'terminal.css');
 
+/* concatenation order matters: selectors → helpers → tagging → consumers */
 const INJECT_SCRIPT_FILES = [
   'settings.js',
-  'dom-utilities.js',
+  'selectors.js',
+  'dom-helpers.js',
+  'chrome-tagging.js',
+  'message-tagging.js',
   'messenger-actions.js',
   'statusline.js',
   'toast.js',
   'search-overlay.js',
   'command-palette.js',
+  'media-viewer.js',
   'theme-application.js',
   'terminal.js'
 ].map((fileName) => path.join(TERMINAL_INJECT_DIRECTORY, fileName));

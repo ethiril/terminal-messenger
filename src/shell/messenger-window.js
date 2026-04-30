@@ -44,6 +44,8 @@ function createMessengerWindow(appConfig, sessionPartition) {
     backgroundColor: '#050805',
     autoHideMenuBar: true,
     show: false,
+    /* drop the macOS gray title bar; statusline takes over as drag handle */
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

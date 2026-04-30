@@ -11,13 +11,25 @@ function applyDocumentTheme() {
 
   body.classList.add('tm-terminal-theme');
   body.classList.toggle('tm-ultra', settings.ultra);
+  /* statusline is appended to <html>, so the platform class has to live there
+     too - the previous body-only flag never matched #tm-statusline */
+  if (/Mac|iPhone|iPad/i.test(navigator.platform ?? '')) {
+    body.classList.add('tm-platform-darwin');
+    documentRoot.classList.add('tm-platform-darwin');
+  }
 
   ensureStatuslineElement();
   tagActiveThread();
   tagChatHeader();
+  tagChatList();
+  tagSearchResultsDropdown();
+  tagThreadIntroCard();
   tagMessageDirections();
   tagSmallLogImages();
   tagReplyQuotes();
+  tagLinkPreviews();
+  tagTypingIndicators();
+  tagActionButtons();
   tagActionToolbarWrappers();
   tagUltraLayoutTargets();
   unblockPasteOnInputs();
