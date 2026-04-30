@@ -68,7 +68,9 @@ function startMutationObserver() {
    when the window later blurs/refocuses (or fb re-renders), the browser
    auto-scrolls the focused element into view - so the chat snaps back to
    the old message even though the user has moved on. blur message focus
-   on every window blur so the next focus event has nothing to scroll to.
+   on every window blur, on every focus, AND on any pointerdown that
+   doesn't land on a message/menu/dialog - that gives the user a "click
+   the background to dismiss" affordance for the lingering focus state.
    inputs/contenteditables (composer + search) keep their focus normally. */
 function bindMessageFocusReleaser() {
   function releaseLingeringMessageFocus() {
@@ -79,8 +81,31 @@ function bindMessageFocusReleaser() {
       active.blur();
     }
   }
+
+  function handleBackgroundPointerDown(event) {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    /* preserve focus when the user clicks something interactive - any
+       message bubble (they may want to long-press to react), the open
+       toolbar/menu, the composer, or the search box */
+    if (target.closest(
+      '[aria-roledescription="message"],'
+      + '[role="article"],'
+      + '[role="menu"],'
+      + '[role="menuitem"],'
+      + '[role="dialog"],'
+      + '[role="toolbar"],'
+      + '[role="button"],'
+      + '[role="link"],'
+      + '[role="textbox"],'
+      + 'input, textarea, [contenteditable="true"]'
+    )) return;
+    releaseLingeringMessageFocus();
+  }
+
   window.addEventListener('blur', releaseLingeringMessageFocus, true);
   window.addEventListener('focus', releaseLingeringMessageFocus, true);
+  document.addEventListener('pointerdown', handleBackgroundPointerDown, true);
 }
 
 function start() {

@@ -173,6 +173,19 @@ body.tm-terminal-theme [role='option']:hover {
   background: var(--tm-dim) !important;
 }
 
+/* fb pads menu items asymmetrically (more above than below the label) so
+   the hover highlight box visibly overshoots the text - the label looks
+   pinned to the top of the highlight rather than centred. force symmetric
+   vertical padding and use line-height alignment for a clean middle. */
+body.tm-terminal-theme [role='menuitem'],
+body.tm-terminal-theme [role='option'] {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  display: flex !important;
+  align-items: center !important;
+  line-height: var(--tm-line-height) !important;
+}
+
 body.tm-terminal-theme a,
 body.tm-terminal-theme span,
 body.tm-terminal-theme div,
@@ -1381,6 +1394,40 @@ body.tm-ultra [data-tm-ultra-composer] {
   background: var(--tm-bg) !important;
   border-top: 1px solid var(--tm-dim) !important;
   padding: 4px 8px !important;
+}
+
+/* fb's native composer adds a small left inset on :hover (presumably to
+   line up an icon or affordance) which reads as a layout jump in ultra
+   mode. nullify hover-driven padding/margin shifts inside the composer so
+   the text bar's geometry stays fixed regardless of cursor position. */
+body.tm-ultra [data-tm-ultra-composer]:hover,
+body.tm-ultra [data-tm-ultra-composer] *:hover {
+  padding-left: revert !important;
+  padding-inline-start: revert !important;
+  margin-left: revert !important;
+  margin-inline-start: revert !important;
+  transform: none !important;
+}
+
+body.tm-ultra [data-tm-ultra-composer],
+body.tm-ultra [data-tm-ultra-composer] * {
+  transition: none !important;
+}
+
+/* ─── text selection in messages ─── */
+
+/* fb sets user-select:none on the message log to prevent accidental drag
+   selection on touch devices, but on desktop we want highlight/copy to
+   work normally. allow text selection inside the message log + thread
+   while keeping the rest of the chrome (chat list, statusline) immune. */
+body.tm-terminal-theme [role='log'],
+body.tm-terminal-theme [role='log'] *,
+body.tm-terminal-theme [data-tm-thread],
+body.tm-terminal-theme [data-tm-thread] *,
+body.tm-terminal-theme [aria-roledescription='message'],
+body.tm-terminal-theme [aria-roledescription='message'] * {
+  -webkit-user-select: text !important;
+  user-select: text !important;
 }
 
 body.tm-ultra [role='log'] [role='row'] {

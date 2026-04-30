@@ -98,8 +98,12 @@ function tagActionButtons() {
   const candidates = document.querySelectorAll(
     '[role="log"] [role="row"] [role="button"], '
     + '[role="log"] [role="row"] button, '
+    + '[role="log"] [aria-roledescription="message"] [role="button"], '
+    + '[role="log"] [aria-roledescription="message"] button, '
     + '[data-tm-thread] [role="row"] [role="button"], '
-    + '[data-tm-thread] [role="row"] button'
+    + '[data-tm-thread] [role="row"] button, '
+    + '[data-tm-thread] [aria-roledescription="message"] [role="button"], '
+    + '[data-tm-thread] [aria-roledescription="message"] button'
   );
   for (const button of candidates) {
     const label = button.getAttribute('aria-label') ?? '';
@@ -172,7 +176,12 @@ function hasTaggedActionButtonChild(wrapper) {
    scan flag: scan flags lock rows out of re-tagging when the row was first
    observed before fb finished rendering the hint text */
 function tagReplyQuotes() {
-  const rows = document.querySelectorAll('[role="log"] [role="row"], [data-tm-thread] [role="row"]');
+  const rows = document.querySelectorAll(
+    '[role="log"] [role="row"],'
+    + '[role="log"] [aria-roledescription="message"],'
+    + '[data-tm-thread] [role="row"],'
+    + '[data-tm-thread] [aria-roledescription="message"]'
+  );
   for (const row of rows) {
     if (row.querySelector('[data-tm-reply-quote]')) continue;
 
