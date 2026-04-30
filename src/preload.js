@@ -1,4 +1,7 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
 const STORAGE_KEY_THEME = 'terminalMessenger.theme';
+const STORAGE_KEY_OPACITY = 'terminalMessenger.opacity';
 const VALID_THEMES = ['green', 'amber', 'cyan', 'mono'];
 
 const EARLY_THEME_PALETTES = {
@@ -17,6 +20,14 @@ function readSavedTheme() {
   } catch {
     return null;
   }
+}
+
+function readSavedOpacityPct() {
+  try {
+    const stored = parseInt(localStorage.getItem(STORAGE_KEY_OPACITY) ?? '', 10);
+    if (Number.isFinite(stored) && stored >= 20 && stored <= 100) return stored;
+  } catch {}
+  return 100;
 }
 
 function applyEarlyThemeClass(activeTheme) {
@@ -64,6 +75,30 @@ function attachEarlyStyleWhenHeadExists(styleElement) {
   headWatcher.observe(document.documentElement, { childList: true, subtree: true });
 }
 
+contextBridge.exposeInMainWorld('terminalMessengerBridge', {
+  setWindowOpacityPct: (pct) => ipcRenderer.invoke('tm:set-opacity', pct),
+  setWindowMuted: (muted) => ipcRenderer.invoke('tm:set-muted', muted),
+  toggleWindowMuted: () => ipcRenderer.invoke('tm:toggle-muted')
+});
+
 const activeTheme = readSavedTheme() ?? 'green';
 applyEarlyThemeClass(activeTheme);
 attachEarlyStyleWhenHeadExists(buildEarlyStyleElement(activeTheme));
+
+/* re-apply persisted opacity early so the window doesn't flash to 100% then dim. */
+const savedOpacity = readSavedOpacityPct();
+if (savedOpacity !== 100) {
+  ipcRenderer.invoke('tm:set-opacity', savedOpacity).catch(() => {});
+}
+
+/* re-apply persisted mute state so the window starts muted if we were muted. */
+function readSavedMuted() {
+  try {
+    return localStorage.getItem('terminalMessenger.muted') === 'true';
+  } catch {
+    return false;
+  }
+}
+if (readSavedMuted()) {
+  ipcRenderer.invoke('tm:set-muted', true).catch(() => {});
+}

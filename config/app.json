@@ -8,7 +8,6 @@
     "www.messenger.com"
   ],
   "theme": "green",
-  "compactByDefault": true,
   "window": {
     "width": 1280,
     "height": 860
