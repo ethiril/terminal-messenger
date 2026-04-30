@@ -143,7 +143,7 @@ function bindSelectionUnblocker() {
     "a, button, [role='button'], [role='link'], [role='menuitem'], img, video,"
     + " input, textarea, [contenteditable='true'], [role='textbox']";
   const NEUTRALIZED_EVENT_TYPES = new Set([
-    'mousedown', 'selectstart', 'dragstart'
+    'mousedown', 'pointerdown', 'selectstart', 'dragstart'
   ]);
 
   const isInsideSelectableSurface = (target) => {
@@ -155,13 +155,20 @@ function bindSelectionUnblocker() {
      stop selection from starting. only no-ops for the relevant event
      types when target is inside a message surface; everything else
      passes through to the original. covers both delegated handlers
-     and inline onfoo="return false" attributes. */
+     and inline onfoo="return false" attributes.
+
+     no INTERACTIVE_TARGET_SELECTOR exclusion here: fb wraps message
+     bubbles themselves in [role='button'], so a target.closest()
+     check for buttons matches the bubble wrapper and lets fb's
+     preventDefault through - which is exactly what blocks selection.
+     letting preventDefault no-op even for clicks on actual reaction /
+     reply buttons is harmless: the click handler still runs (we're
+     not stopping propagation here, just neutralizing preventDefault). */
   const originalPreventDefault = Event.prototype.preventDefault;
   Event.prototype.preventDefault = function patchedPreventDefault() {
     if (NEUTRALIZED_EVENT_TYPES.has(this.type)) {
       const target = this.target;
       if (target instanceof Element
-          && !target.closest(INTERACTIVE_TARGET_SELECTOR)
           && target.closest(SELECTABLE_SURFACE_SELECTOR)) {
         return;
       }

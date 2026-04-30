@@ -44,6 +44,18 @@ html.tm-theme-mocha {
   --tm-dim: #313244;
 }
 
+/* twilight: muted dusk variant of neon - darker bg (a touch darker than
+   macchiato), text reads like a softer / more pastel lavender than neon,
+   accent stays a pastel blue but desaturated. sits between mocha and
+   neon both alphabetically in the cycle and in mood. */
+html.tm-theme-twilight {
+  --tm-bg: #1c1f2e;
+  --tm-text: #dfcef5;
+  --tm-muted: #6f5e87;
+  --tm-accent: #a8b8e0;
+  --tm-dim: #292c3d;
+}
+
 /* neon: cyberpunk / synthwave palette - deep purple-black bg, lavender
    body text, pastel-electric blue accent (used for sent messages). */
 html.tm-theme-neon {

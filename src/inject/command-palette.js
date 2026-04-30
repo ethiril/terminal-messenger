@@ -7,7 +7,7 @@ const HELP_OUTPUT = [
   ':focus message    focus the message composer',
   ':focus search     focus messenger native search',
   ':goto <name>      open the first chat matching <name> (alias: :c)',
-  ':theme green|amber|cyan|mono|mocha|neon|macchiato|frappe|latte',
+  ':theme green|amber|cyan|mono|mocha|twilight|neon|macchiato|frappe|latte',
   ':ultra  [on|off]  ultra terminal mode (no arg = toggle)',
   ':opacity <20-100> window transparency, in percent',
   ':mute   [on|off]  mute window audio (no arg = toggle)',
@@ -39,7 +39,7 @@ function ensurePaletteElement() {
     <section class="tm-command-panel" role="dialog" aria-modal="true" aria-label="Terminal Messenger command palette">
       <div class="tm-command-title">~/messenger %</div>
       <input class="tm-command-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder=":help" />
-      <div class="tm-command-hint">help · search · theme [green|amber|cyan|mono|mocha|neon|macchiato|frappe|latte] · ultra [on|off] · opacity &lt;20-100&gt; · mute · focus [message|search] · unread · reload · q</div>
+      <div class="tm-command-hint">help · search · theme [green|amber|cyan|mono|mocha|twilight|neon|macchiato|frappe|latte] · ultra [on|off] · opacity &lt;20-100&gt; · mute · focus [message|search] · unread · reload · q</div>
       <pre class="tm-command-output"></pre>
     </section>
   `;
@@ -85,15 +85,22 @@ function closePalette() {
 }
 
 function runThemeCommand(commandArgs) {
-  if (!commandArgs[0]) return 'usage: :theme green|amber|cyan|mono|mocha|neon|macchiato|frappe|latte';
+  if (!commandArgs[0]) return 'usage: :theme green|amber|cyan|mono|mocha|twilight|neon|macchiato|frappe|latte';
   setTheme(commandArgs[0]);
   return `theme=${settings.theme}`;
 }
 
 function runOpacityCommand(commandArgs) {
   if (!commandArgs[0]) return `opacity=${settings.opacityPct}% (usage: :opacity <20-100>)`;
-  const requestedPct = parseInt(commandArgs[0].replace(/%$/, ''), 10);
+  const stripped = commandArgs[0].replace(/%$/, '');
+  let requestedPct = parseFloat(stripped);
   if (!Number.isFinite(requestedPct)) return 'usage: :opacity <20-100>';
+  /* accept css-style fractional input ("0.98") - if the value contains a
+     decimal point and falls in [0,1], treat it as a 0-1 fraction and
+     scale to percent. inputs without a decimal stay as percent values. */
+  if (stripped.includes('.') && requestedPct >= 0 && requestedPct <= 1) {
+    requestedPct *= 100;
+  }
   const appliedPct = setOpacityPct(requestedPct);
   return `opacity=${appliedPct}%`;
 }
