@@ -114,98 +114,134 @@ function bindMessageFocusReleaser() {
   document.addEventListener('pointerdown', handleBackgroundPointerDown, true);
 }
 
-/* fb blocks drag-selection in messenger using two layers of defense:
-   (1) capture-phase event handlers that call event.preventDefault() on
-       mousedown/selectstart/dragstart, and
-   (2) inline onmousedown="return false" handlers on bubble wrappers.
+/* fb blocks drag-selection in messenger by calling preventDefault on
+   mousedown through a path we can't reliably intercept. their bundle
+   runs during HTML parsing, before our dom-ready injection - if their
+   code stashes a reference to Event.prototype.preventDefault at module
+   load and calls it directly, any later monkey-patch we install is
+   bypassed. inline onmousedown="return false" handlers go through a
+   c++ path that sets the defaultPrevented flag without re-entering JS
+   either. neutralizing inline attributes catches some bubbles but
+   leaves React-installed handlers intact.
 
-   stopping propagation at the window level neutralizes (1) only when
-   our listener runs first, which isn't guaranteed if fb registered on
-   window at capture phase before our injection ran. and stopping
-   propagation does nothing about (2), since inline handlers fire at
-   target phase regardless.
+   instead of fighting the blockers, drive selection ourselves via the
+   Selection API. preventDefault on mousedown only stops the browser's
+   built-in selection mechanism; programmatic Selection.setBaseAndExtent
+   works regardless of what fb did. CSS already permits user-select:text
+   on message surfaces (terminal.css), which is all the API needs.
 
-   the only fully reliable counter is to neutralize preventDefault()
-   itself for selection-related events when the target is inside a
-   message surface. monkey-patching Event.prototype.preventDefault is
-   surgical: it only no-ops the call when type+target match, and
-   passes through unchanged for everything else (link clicks etc).
-
-   we also stopImmediatePropagation as a belt-and-suspenders measure -
-   useful for fb listeners that don't preventDefault but instead clear
-   the selection programmatically (selection.removeAllRanges). runs in
-   both terminal and vanilla mode. */
-function bindSelectionUnblocker() {
+   double-click → word, triple-click → line, both via Selection.modify
+   (chromium-supported, non-standard but reliable here since this is an
+   electron app pinned to a chromium build). */
+function bindManualSelectionDriver() {
   const SELECTABLE_SURFACE_SELECTOR =
     "[role='log'], [data-tm-thread], [aria-roledescription='message'],"
-    + " [aria-label*='Messages in conversation'], [role='article']";
-  const NEUTRALIZED_EVENT_TYPES = new Set([
-    'mousedown', 'pointerdown', 'selectstart', 'dragstart'
-  ]);
+    + " [aria-label*='Messages in conversation']";
+  /* skip natively-editable surfaces - they have their own selection
+     behavior we'd interfere with. NOT excluding [role='button']: fb
+     wraps message bubbles in role=button, so excluding would skip
+     selection on bubbles themselves. real button clicks still fire
+     because we never stopPropagation - we only set selection alongside
+     normal click dispatch. */
+  const NATIVELY_EDITABLE_SELECTOR =
+    "input, textarea, [contenteditable='true'], [role='textbox']";
 
-  const isInsideSelectableSurface = (target) => {
-    if (!(target instanceof Element)) return false;
-    return Boolean(target.closest(SELECTABLE_SURFACE_SELECTOR));
-  };
+  let dragOriginPoint = null;
 
-  /* monkey-patch Event.prototype.preventDefault so fb's handlers can't
-     stop selection from starting. only no-ops for the relevant event
-     types when target is inside a message surface; everything else
-     passes through to the original. covers both delegated handlers
-     and inline onfoo="return false" attributes.
-
-     no interactive-target exclusion: fb wraps message bubbles
-     themselves in [role='button'], so a closest()-style check for
-     buttons would match the bubble wrapper and let fb's preventDefault
-     through - which is exactly what blocks selection. letting
-     preventDefault no-op even for clicks on actual reaction / reply
-     buttons is harmless: the click handler still runs (we're not
-     stopping propagation here, just neutralizing preventDefault). */
-  const originalPreventDefault = Event.prototype.preventDefault;
-  Event.prototype.preventDefault = function patchedPreventDefault() {
-    if (NEUTRALIZED_EVENT_TYPES.has(this.type)) {
-      const target = this.target;
-      if (target instanceof Element
-          && target.closest(SELECTABLE_SURFACE_SELECTOR)) {
-        return;
-      }
+  function caretRangeAt(x, y) {
+    if (typeof document.caretRangeFromPoint === 'function') {
+      return document.caretRangeFromPoint(x, y);
     }
-    return originalPreventDefault.apply(this, arguments);
-  };
+    if (typeof document.caretPositionFromPoint === 'function') {
+      const position = document.caretPositionFromPoint(x, y);
+      if (!position) return null;
+      const range = document.createRange();
+      range.setStart(position.offsetNode, position.offset);
+      range.setEnd(position.offsetNode, position.offset);
+      return range;
+    }
+    return null;
+  }
 
-  /* register on window at capture phase: capture dispatches window →
-     document → ... in tree order, so a window-level capture listener
-     fires before any of fb's handlers at document or descendants.
+  function applyDragSelection(originX, originY, currentX, currentY) {
+    const startRange = caretRangeAt(originX, originY);
+    const endRange = caretRangeAt(currentX, currentY);
+    if (!startRange || !endRange) return;
+    const selection = window.getSelection();
+    if (!selection) return;
+    try {
+      /* setBaseAndExtent handles forward + backward direction in one
+         call. throws if either node detached - swallow and continue
+         since fb may re-render mid-drag. */
+      selection.setBaseAndExtent(
+        startRange.startContainer, startRange.startOffset,
+        endRange.startContainer, endRange.startOffset
+      );
+    } catch {}
+  }
 
-     no interactive-target exclusion - same reason as the
-     preventDefault patch above: fb wraps message bubbles in
-     [role='button'], so excluding interactive targets means we
-     never short-circuit fb's bubble-level mousedown handlers (which
-     are exactly the ones blocking selection). real reaction / reply
-     buttons still respond to clicks because click events are
-     dispatched independently of mousedown - we only intercept
-     mousedown. trade-off: long-press-to-react may stop firing on
-     bubbles, but that gesture isn't a desktop-web messenger
-     affordance anyway (the floating action toolbar covers reactions). */
+  function selectExpansion(x, y, granularity) {
+    const range = caretRangeAt(x, y);
+    if (!range) return;
+    const selection = window.getSelection();
+    if (!selection) return;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    if (typeof selection.modify !== 'function') return;
+    selection.modify('move', 'backward', granularity);
+    selection.modify('extend', 'forward', granularity);
+  }
+
+  function shouldDriveSelection(target) {
+    if (!(target instanceof Element)) return false;
+    if (target.closest(NATIVELY_EDITABLE_SELECTOR)) return false;
+    return Boolean(target.closest(SELECTABLE_SURFACE_SELECTOR));
+  }
+
+  /* register on window at capture phase: runs before any listener
+     deeper in the tree, so we always see the event even if fb stops
+     propagation at document or below. */
   window.addEventListener('mousedown', (event) => {
     if (event.button !== 0) return;
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-    if (!isInsideSelectableSurface(target)) return;
-    event.stopImmediatePropagation();
+    if (!shouldDriveSelection(event.target)) return;
+
+    /* event.detail counts consecutive clicks within the browser's
+       double-click interval. 3+ → line, 2 → word, 1 → start drag. */
+    if (event.detail >= 3) {
+      selectExpansion(event.clientX, event.clientY, 'lineboundary');
+      dragOriginPoint = null;
+      return;
+    }
+    if (event.detail === 2) {
+      selectExpansion(event.clientX, event.clientY, 'word');
+      dragOriginPoint = null;
+      return;
+    }
+
+    dragOriginPoint = { x: event.clientX, y: event.clientY };
+    /* clear prior selection - matches the browser's native click-to-
+       deselect behavior, which fb's preventDefault has been blocking. */
+    window.getSelection()?.removeAllRanges();
   }, true);
 
-  window.addEventListener('selectstart', (event) => {
-    if (!isInsideSelectableSurface(event.target)) return;
-    event.stopImmediatePropagation();
+  window.addEventListener('mousemove', (event) => {
+    if (!dragOriginPoint) return;
+    /* event.buttons is a bitmask; bit 0 = primary button. if the user
+       released outside the window we never see mouseup, so falling
+       through here resets state. */
+    if ((event.buttons & 1) === 0) {
+      dragOriginPoint = null;
+      return;
+    }
+    applyDragSelection(
+      dragOriginPoint.x, dragOriginPoint.y,
+      event.clientX, event.clientY
+    );
   }, true);
 
-  window.addEventListener('dragstart', (event) => {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-    if (target.matches('img, video, a')) return;
-    if (!isInsideSelectableSurface(target)) return;
-    event.stopImmediatePropagation();
+  window.addEventListener('mouseup', (event) => {
+    if (event.button !== 0) return;
+    dragOriginPoint = null;
   }, true);
 }
 
@@ -216,7 +252,7 @@ function start() {
   bindKeyboardShortcuts();
   bindMediaViewerEvents();
   bindMessageFocusReleaser();
-  bindSelectionUnblocker();
+  bindManualSelectionDriver();
   startMutationObserver();
   startStatuslineClock();
 }
