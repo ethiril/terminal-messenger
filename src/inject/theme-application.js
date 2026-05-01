@@ -2,6 +2,11 @@ function applyDocumentTheme() {
   const documentRoot = document.documentElement;
   if (!documentRoot) return;
 
+  /* selection unblocking has to run in both terminal and vanilla mode
+     (fb's inline mousedown blockers don't care which theme we're in),
+     so do it before the themeDisabled early-return below. */
+  unblockSelectionOnMessages();
+
   /* vanilla-mode escape hatch: when settings.themeDisabled is true, strip
      every terminal-mode class from <html>/<body> and bail before any of
      the JS-based tagging runs. all of the CSS selectors are scoped under

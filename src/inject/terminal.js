@@ -139,9 +139,6 @@ function bindSelectionUnblocker() {
   const SELECTABLE_SURFACE_SELECTOR =
     "[role='log'], [data-tm-thread], [aria-roledescription='message'],"
     + " [aria-label*='Messages in conversation'], [role='article']";
-  const INTERACTIVE_TARGET_SELECTOR =
-    "a, button, [role='button'], [role='link'], [role='menuitem'], img, video,"
-    + " input, textarea, [contenteditable='true'], [role='textbox']";
   const NEUTRALIZED_EVENT_TYPES = new Set([
     'mousedown', 'pointerdown', 'selectstart', 'dragstart'
   ]);
@@ -157,13 +154,13 @@ function bindSelectionUnblocker() {
      passes through to the original. covers both delegated handlers
      and inline onfoo="return false" attributes.
 
-     no INTERACTIVE_TARGET_SELECTOR exclusion here: fb wraps message
-     bubbles themselves in [role='button'], so a target.closest()
-     check for buttons matches the bubble wrapper and lets fb's
-     preventDefault through - which is exactly what blocks selection.
-     letting preventDefault no-op even for clicks on actual reaction /
-     reply buttons is harmless: the click handler still runs (we're
-     not stopping propagation here, just neutralizing preventDefault). */
+     no interactive-target exclusion: fb wraps message bubbles
+     themselves in [role='button'], so a closest()-style check for
+     buttons would match the bubble wrapper and let fb's preventDefault
+     through - which is exactly what blocks selection. letting
+     preventDefault no-op even for clicks on actual reaction / reply
+     buttons is harmless: the click handler still runs (we're not
+     stopping propagation here, just neutralizing preventDefault). */
   const originalPreventDefault = Event.prototype.preventDefault;
   Event.prototype.preventDefault = function patchedPreventDefault() {
     if (NEUTRALIZED_EVENT_TYPES.has(this.type)) {
@@ -178,12 +175,22 @@ function bindSelectionUnblocker() {
 
   /* register on window at capture phase: capture dispatches window →
      document → ... in tree order, so a window-level capture listener
-     fires before any of fb's handlers at document or descendants. */
+     fires before any of fb's handlers at document or descendants.
+
+     no interactive-target exclusion - same reason as the
+     preventDefault patch above: fb wraps message bubbles in
+     [role='button'], so excluding interactive targets means we
+     never short-circuit fb's bubble-level mousedown handlers (which
+     are exactly the ones blocking selection). real reaction / reply
+     buttons still respond to clicks because click events are
+     dispatched independently of mousedown - we only intercept
+     mousedown. trade-off: long-press-to-react may stop firing on
+     bubbles, but that gesture isn't a desktop-web messenger
+     affordance anyway (the floating action toolbar covers reactions). */
   window.addEventListener('mousedown', (event) => {
     if (event.button !== 0) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
-    if (target.closest(INTERACTIVE_TARGET_SELECTOR)) return;
     if (!isInsideSelectableSurface(target)) return;
     event.stopImmediatePropagation();
   }, true);
