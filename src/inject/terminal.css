@@ -465,6 +465,35 @@ body.tm-terminal-theme [data-tm-thread] img:not([data-tm-img-size]) {
   object-fit: contain !important;
 }
 
+/* reply-row image previews are thumbnails fb intends to render small
+   (~80-100px). the 480x360 cap above sized them like full content
+   images, so they pushed past the row's allocated height and the
+   response wrapper (avatar + new reply text) ended up rendered on top
+   of the overflow. cap previews thumbnail-sized so the row's
+   composer + response stack stays within bounds. this also covers the
+   uncommon case of replying *with* an image - the new image will be
+   the same thumbnail size, which is fine for inline replies. */
+body.tm-terminal-theme [role='log'] [data-tm-has-reply] img[data-tm-img-size='large'],
+body.tm-terminal-theme [data-tm-thread] [data-tm-has-reply] img[data-tm-img-size='large'] {
+  max-width: 160px !important;
+  max-height: 100px !important;
+}
+
+/* fb pulls the response wrapper up by 16px via a margin-bottom: -16px
+   on a wrapper around the image-preview - a stylistic accent that
+   intentionally overlaps the response onto the bottom of the quote in
+   their default UI, paired with a rounded bubble backdrop behind the
+   text for legibility. without that backdrop in our terminal aesthetic
+   the avatar + new reply text just render on top of the image. fb
+   nests the quoted img ~10 levels deep and the negative margin lives
+   far above the img, so we zero margin-bottom on every ancestor div
+   inside the reply row. that drops a few px of intentional spacing
+   (e.g. on the outer reply container) which is fine - row padding
+   handles inter-message gaps. */
+body.tm-terminal-theme [data-tm-has-reply] div:has(img[data-tm-img-size='large']) {
+  margin-bottom: 0 !important;
+}
+
 body.tm-terminal-theme [role='log'] img[data-tm-img-size='small'] {
   width: 12px !important;
   height: 12px !important;
