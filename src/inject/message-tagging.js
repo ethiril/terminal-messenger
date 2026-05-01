@@ -196,23 +196,50 @@ function tagReplyQuotes() {
 
     /* when the climb stopped at a wrapper that contains only the hint
        (because the original-message preview lives as a sibling to that
-       wrapper rather than inside it), also tag the next text-bearing
-       sibling - that's the quoted message. without this, only the small
-       "Ev replied to you" line dimmed and the quoted body kept reading as
-       full-strength message text. */
+       wrapper rather than inside it), also tag the sibling that holds
+       the quoted message. without this, only the small "Ev replied to
+       you" line dimmed and the quoted body kept reading as full-strength
+       message text.
+
+       reply-to-image quotes have no text content (the preview is a bare
+       <img>/<video>), so a text-only check skipped past the actual quote
+       sibling and engulfed the response wrapper - which contains the
+       sender avatar plus the new reply text - dimming the user's own
+       words. take the first sibling that looks like a quote: media-only
+       (has an image-grade <img>/<video>/<picture>) wins over text. fall
+       back to text only when no media-only sibling exists. */
     const blockText = (replyBlock.textContent ?? '').trim();
     const hintText = (hintElement.textContent ?? '').trim();
     if (blockText.length > hintText.length + 4) continue;
 
+    let mediaQuote = null;
+    let textQuote = null;
     let candidate = replyBlock.nextElementSibling;
     while (candidate) {
       const candidateText = (candidate.textContent ?? '').trim();
-      if (candidateText.length >= 4 && !REPLY_HINT_PATTERN.test(candidateText)) {
-        candidate.setAttribute('data-tm-reply-quote', 'true');
+      const looksLikeNewMessage = candidateText.length >= 4
+        && !REPLY_HINT_PATTERN.test(candidateText);
+      const hasContentMedia = candidate.querySelector(
+        'img[data-tm-img-size="large"], video, picture'
+      );
+      /* fb only ever places the sender avatar inside the response
+         wrapper, never inside a quote wrapper. presence of a small img
+         lets us reject the response sibling, which the previous "first
+         text-bearing sibling" rule kept catching for image replies
+         (image quote has no text -> skipped -> response engulfed +
+         dimmed alongside the user's actual reply). */
+      const hasAvatar = candidate.querySelector('img[data-tm-img-size="small"]');
+      if (hasContentMedia && candidateText.length < 4) {
+        mediaQuote = candidate;
         break;
+      }
+      if (!mediaQuote && looksLikeNewMessage && !textQuote && !hasAvatar) {
+        textQuote = candidate;
       }
       candidate = candidate.nextElementSibling;
     }
+    const quote = mediaQuote ?? textQuote;
+    if (quote) quote.setAttribute('data-tm-reply-quote', 'true');
   }
 }
 

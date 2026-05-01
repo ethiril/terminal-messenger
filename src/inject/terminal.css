@@ -195,6 +195,53 @@ body.tm-terminal-theme [aria-modal='true'] {
   padding: 6px 8px !important;
 }
 
+/* fb's GIF / sticker picker is a [role='dialog'] popover whose
+   scroll container depends on the dialog's intrinsic inner height.
+   the generic padding+border above shrinks that height enough that
+   fb's intended scroller stops overflowing - instead a deeper inner
+   wrapper (no scroll UI) ends up clipping content, so the bar
+   disappears entirely. for picker-shaped dialogs (search input +
+   media grid) keep the visual chrome via outline (no box-model
+   space) and zero the padding so fb's layout sees the dialog at
+   the size it expects. */
+body.tm-terminal-theme [role='dialog']:has(input):has(img),
+body.tm-terminal-theme [aria-modal='true']:has(input):has(img) {
+  padding: 0 !important;
+  border: none !important;
+  outline: 1px solid var(--tm-dim) !important;
+  outline-offset: -1px !important;
+}
+
+/* the picker uses a flex column where the scroll container must shrink
+   below content height to enable overflow scrolling. our generic
+   `[role='dialog'] *` rule below sets min-height: revert (= auto) to
+   protect dialogs from div crushing, but for flex children that means
+   "can't shrink below content" - so the GIF grid balloons to its full
+   intrinsic height (1200+ px), the parent's overflow:hidden clips it,
+   and fb's intended scrollbar never surfaces because nothing actually
+   overflows the (now grown) scroller. restore min-height: 0 inside
+   pickers so the flex layout can constrain the scroller and the bar
+   appears. */
+body.tm-terminal-theme [role='dialog']:has(input):has(img) *,
+body.tm-terminal-theme [aria-modal='true']:has(input):has(img) * {
+  min-height: 0 !important;
+}
+
+/* the dialog img reset below (`height: auto`) forces picker tiles to
+   their natural pixel dimensions, so each GIF renders at ~200px tall
+   instead of fb's intended 70-180px aspect-fitted size. inside pickers,
+   yield to fb's sizing so the grid stays tight and lazy-load triggers
+   the way fb expects. */
+body.tm-terminal-theme [role='dialog']:has(input):has(img) img,
+body.tm-terminal-theme [role='dialog']:has(input):has(img) video,
+body.tm-terminal-theme [aria-modal='true']:has(input):has(img) img,
+body.tm-terminal-theme [aria-modal='true']:has(input):has(img) video {
+  width: revert !important;
+  height: revert !important;
+  max-width: revert !important;
+  max-height: revert !important;
+}
+
 /* the inline reaction picker ("❤️ 😂 😮 😢 😠 👍 +") opens as a tight strip
    with the global div crush stripping its breathing room - explicit gap +
    inner padding keeps each emoji separated from the next and from the border */
@@ -1000,6 +1047,18 @@ body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] {
   max-width: 100% !important;
 }
 
+/* image / video reply quotes: the preview is the thing being responded to,
+   not quoted text the user wrote, so wrapper opacity makes the image read
+   as washed-out rather than as a recognisable thumbnail. css opacity on a
+   parent caps child opacity (it's multiplicative), so we have to clear it
+   on the wrapper rather than override per-descendant. the border-indent +
+   muted color on any accompanying text still mark it as a quote. */
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote]:has(img),
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote]:has(video),
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote]:has(picture) {
+  opacity: 1 !important;
+}
+
 body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote],
 body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] *,
 body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] span,
@@ -1007,6 +1066,21 @@ body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] div,
 body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] a {
   color: var(--tm-muted) !important;
   font-style: italic !important;
+}
+
+/* the "Edited" affordance fb appends to edited messages renders as a
+   role=button with aria-label="Edited" and an inline color of the fb
+   theme accent (mwp-primary-theme-color), so it pops as a bright
+   coloured pill against terminal text. style it to read like reply
+   quote text - muted + italic + dimmed - so it's clearly secondary
+   metadata rather than a call to action. */
+body.tm-terminal-theme [role='log'] [aria-label='Edited'],
+body.tm-terminal-theme [role='log'] [aria-label='Edited'] *,
+body.tm-terminal-theme [data-tm-thread] [aria-label='Edited'],
+body.tm-terminal-theme [data-tm-thread] [aria-label='Edited'] * {
+  color: var(--tm-muted) !important;
+  font-style: italic !important;
+  opacity: 0.55 !important;
 }
 
 body.tm-terminal-theme [role='log'] [aria-label*='reaction' i],
