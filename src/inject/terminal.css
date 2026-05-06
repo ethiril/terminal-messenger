@@ -458,6 +458,31 @@ body.tm-terminal-theme [data-tm-thread] canvas {
   object-fit: contain !important;
 }
 
+/* JS-marked videos in the log: bump the size cap, expose native browser
+   controls, and force an aspect-respecting box so the controls bar can't
+   overlap with the frame above. matches the "default mode" feel where a
+   video takes ~half the chat width with a visible scrubber. */
+body.tm-terminal-theme [role='log'] video[data-tm-video-controls],
+body.tm-terminal-theme [data-tm-thread] video[data-tm-video-controls] {
+  display: block !important;
+  width: 100% !important;
+  max-width: 560px !important;
+  max-height: 420px !important;
+  height: auto !important;
+  object-fit: contain !important;
+  background: #000 !important;
+  outline: none !important;
+}
+
+/* don't let any ancestor's overflow:hidden chop the bottom of the video
+   controls bar - fb's bubble wrappers occasionally clip the last row of
+   pixels which trims the timeline. */
+body.tm-terminal-theme [role='log'] *:has(> video[data-tm-video-controls]),
+body.tm-terminal-theme [data-tm-thread] *:has(> video[data-tm-video-controls]) {
+  overflow: visible !important;
+  max-height: none !important;
+}
+
 body.tm-terminal-theme [role='log'] img:not([data-tm-img-size]),
 body.tm-terminal-theme [data-tm-thread] img:not([data-tm-img-size]) {
   max-width: 480px !important;
@@ -961,6 +986,36 @@ body.tm-terminal-theme [aria-roledescription='message'] [role='presentation']:ha
   display: block !important;
 }
 
+/* right-align wrapped text on outgoing messages so the second/third line
+   hugs the right edge instead of stranding whitespace next to a short
+   continuation ("background of mocha" floating mid-row). scoped to text
+   bubbles via div[dir='auto'] so images/link-cards/reaction strips keep
+   their natural alignment. matches the visual logic of an anchored
+   right-aligned bubble: every line ends where the bubble ends. */
+body.tm-terminal-theme [aria-roledescription='message'][data-tm-direction='out'] div[dir='auto'],
+body.tm-terminal-theme [aria-roledescription='message'][data-tm-direction='out'] div[dir='auto'] *,
+body.tm-terminal-theme [role='row'][data-tm-direction='out'] div[dir='auto'],
+body.tm-terminal-theme [role='row'][data-tm-direction='out'] div[dir='auto'] * {
+  text-align: right !important;
+}
+
+/* incoming text stays left-aligned but make wrap-friendly hyphenation
+   forgiving on long URLs / no-space tokens so a single long word doesn't
+   force the bubble to outgrow its column. */
+body.tm-terminal-theme [aria-roledescription='message'] div[dir='auto'],
+body.tm-terminal-theme [role='row'] div[dir='auto'] {
+  overflow-wrap: anywhere !important;
+  word-break: normal !important;
+}
+
+/* tighten readable line-height on message text - 1.5 (set on the row) is
+   loose for short single-line messages but feels airy on multi-line ones
+   too. 1.45 reads cleaner and reduces vertical span on wrapped messages. */
+body.tm-terminal-theme [aria-roledescription='message'] div[dir='auto'],
+body.tm-terminal-theme [aria-roledescription='message'] div[dir='auto'] * {
+  line-height: 1.45 !important;
+}
+
 /* extra breathing room between messages - regular messenger pads ~6-8px
    between consecutive messages, our tight terminal layout collapsed that
    down to ~2px and made the log feel like an undifferentiated wall of
@@ -1135,9 +1190,24 @@ body.tm-terminal-theme [role='log'] [aria-label*='Reactions' i] svg {
 
 /* swap fb's animated three-dot typing bubble for a literal "..." string -
    the original svg dots got crushed into a single lime swirl by our global
-   svg sizing, so just hide every visual descendant and render text via ::after */
-body.tm-terminal-theme [data-tm-typing-indicator] > * {
+   svg sizing, and newer builds animate the dots via styled <div> elements
+   with clip-path/mask, no descendants - so neither hiding children nor
+   hiding their pseudo-elements is enough. nuke the row itself's painted
+   shape (background/clip-path/mask/border-radius) and every descendant +
+   pseudo, then re-render via the row's own ::after. */
+body.tm-terminal-theme [data-tm-typing-indicator] *,
+body.tm-terminal-theme [data-tm-typing-indicator] *::before,
+body.tm-terminal-theme [data-tm-typing-indicator] *::after,
+body.tm-terminal-theme [data-tm-typing-indicator]::before {
   display: none !important;
+  visibility: hidden !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  animation: none !important;
+  clip-path: none !important;
+  mask: none !important;
+  -webkit-mask: none !important;
 }
 
 body.tm-terminal-theme [data-tm-typing-indicator] {
@@ -1147,12 +1217,31 @@ body.tm-terminal-theme [data-tm-typing-indicator] {
   color: var(--tm-muted) !important;
   opacity: 0.8 !important;
   font-style: italic !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  clip-path: none !important;
+  mask: none !important;
+  -webkit-mask: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+  width: auto !important;
+  max-width: 100% !important;
 }
 
 body.tm-terminal-theme [data-tm-typing-indicator]::after {
   content: '. . .';
+  display: inline-block !important;
+  visibility: visible !important;
   letter-spacing: 2px;
   color: var(--tm-muted) !important;
+  animation: tm-typing-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes tm-typing-pulse {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 1; }
 }
 
 /* ─── inputs ─── */
@@ -1528,6 +1617,45 @@ html.tm-platform-darwin #tm-statusline[data-tm-vanilla] {
   display: block !important;
   object-fit: contain;
   border: 1px solid var(--tm-dim);
+  background: #000 !important;
+}
+
+#tm-media-viewer-root .tm-media-viewer-img.tm-media-viewer-hidden {
+  display: none !important;
+}
+
+/* slot fb's live <video> gets reparented into. when empty it collapses;
+   when a video is mounted it expands and centers it like the image. */
+#tm-media-viewer-root .tm-media-viewer-video-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+}
+
+#tm-media-viewer-root .tm-media-viewer-video-slot[data-tm-media-empty="true"] {
+  display: none !important;
+}
+
+/* the body-scoped video rule earlier in this file caps videos to 480x360
+   inside the log; once mounted in the viewer we want the full available
+   area. higher specificity (#id .class .class) + !important wins. */
+#tm-media-viewer-root .tm-media-viewer-video-slot video.tm-media-viewer-active-video {
+  display: block !important;
+  width: auto !important;
+  height: auto !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  object-fit: contain !important;
+  background: #000 !important;
+  border: 1px solid var(--tm-dim) !important;
+  border-radius: 0 !important;
+  outline: none !important;
 }
 
 /* ─── toast ─── */
@@ -1687,9 +1815,77 @@ body.tm-terminal-theme [role='log'] [data-tm-link-preview],
 body.tm-terminal-theme [data-tm-thread] [data-tm-link-preview] {
   display: inline-block !important;
   border: 1px solid var(--tm-dim) !important;
-  padding: 4px 6px !important;
+  padding: 6px 8px !important;
   margin: 4px 0 !important;
   max-width: 480px !important;
+  text-decoration: none !important;
+  text-align: left !important;
+}
+
+/* link preview title: bold + slightly larger, with breathing room above
+   the description so the two never blur into one paragraph. fb's nested
+   spans inherit overflow:hidden + text-overflow:ellipsis from their parent
+   bubble, which clipped each wrapped line on the right ("Ahsoka senses
+   Ana[]" instead of full text). force the whole title subtree to wrap
+   normally with visible overflow so all characters show. */
+body.tm-terminal-theme [data-tm-link-preview] [data-tm-link-title],
+body.tm-terminal-theme [data-tm-link-preview] [data-tm-link-title] * {
+  display: block !important;
+  font-weight: 700 !important;
+  color: var(--tm-text) !important;
+  line-height: 1.35 !important;
+  text-align: left !important;
+  text-decoration: none !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  -webkit-line-clamp: unset !important;
+  -webkit-box-orient: unset !important;
+  max-width: 100% !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+}
+
+body.tm-terminal-theme [data-tm-link-preview] [data-tm-link-title] {
+  margin: 4px 0 2px !important;
+}
+
+/* description: muted + slightly tighter, on its own line so the title no
+   longer butts into the description. share the same un-clamp/un-clip
+   treatment as the title - long URLs in the description used to chop
+   ("https://youtu.be/...Duel with Mar[]") because of inherited ellipsis. */
+body.tm-terminal-theme [data-tm-link-preview] [data-tm-link-desc],
+body.tm-terminal-theme [data-tm-link-preview] [data-tm-link-desc] * {
+  display: block !important;
+  color: var(--tm-muted) !important;
+  font-weight: 400 !important;
+  line-height: 1.35 !important;
+  text-align: left !important;
+  text-decoration: none !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  -webkit-line-clamp: unset !important;
+  -webkit-box-orient: unset !important;
+  max-width: 100% !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+}
+
+body.tm-terminal-theme [data-tm-link-preview] [data-tm-link-desc] {
+  margin: 0 0 2px !important;
+  font-size: 0.95em !important;
+}
+
+/* the link preview anchor itself was inline-block - that's fine for
+   sizing, but its child wrappers inherited width:max-content from fb,
+   so wrapped lines couldn't break inside the 480px frame. force the
+   inner stack to a normal block layout that respects the parent's
+   width and wraps cleanly. */
+body.tm-terminal-theme [data-tm-link-preview] > *,
+body.tm-terminal-theme [data-tm-link-preview] > * > * {
+  max-width: 100% !important;
+  width: auto !important;
 }
 
 /* image sizing in ultra used to be capped tighter (420x320 vs the 480x360

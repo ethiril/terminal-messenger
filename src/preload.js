@@ -2,7 +2,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const STORAGE_KEY_THEME = 'terminalMessenger.theme';
 const STORAGE_KEY_OPACITY = 'terminalMessenger.opacity';
+const STORAGE_KEY_MUTED = 'terminalMessenger.muted';
 const VALID_THEMES = ['green', 'amber', 'cyan', 'mono', 'mocha', 'twilight', 'neon', 'macchiato', 'frappe', 'latte'];
+const STORED_SETTINGS_FLAG = '--tm-stored-settings=';
 
 const EARLY_THEME_PALETTES = {
   green: { background: '#050805', foreground: '#c8e8c0' },
@@ -19,7 +21,27 @@ const EARLY_THEME_PALETTES = {
 
 const EARLY_STYLE_ELEMENT_ID = 'tm-early-style';
 
+/* settings handed in from main via additionalArguments — survive even if
+   Electron's localStorage gets purged (logout, partition reset, etc).
+   the sandboxed preload has DOM atob() but not Node's Buffer, so decode
+   the base64 wrapper through atob. settings keys are ASCII-safe. */
+function readStoredSettingsFromArgs() {
+  const flag = process.argv.find((arg) => arg.startsWith(STORED_SETTINGS_FLAG));
+  if (!flag) return {};
+  try {
+    const encoded = flag.slice(STORED_SETTINGS_FLAG.length);
+    const decoded = atob(encoded);
+    const parsed = JSON.parse(decoded);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+const storedSettings = readStoredSettingsFromArgs();
+
 function readSavedTheme() {
+  if (VALID_THEMES.includes(storedSettings.theme)) return storedSettings.theme;
   try {
     const savedTheme = localStorage.getItem(STORAGE_KEY_THEME);
     return VALID_THEMES.includes(savedTheme) ? savedTheme : null;
@@ -29,6 +51,10 @@ function readSavedTheme() {
 }
 
 function readSavedOpacityPct() {
+  if (Number.isFinite(storedSettings.opacityPct)
+      && storedSettings.opacityPct >= 20 && storedSettings.opacityPct <= 100) {
+    return storedSettings.opacityPct;
+  }
   try {
     const stored = parseInt(localStorage.getItem(STORAGE_KEY_OPACITY) ?? '', 10);
     if (Number.isFinite(stored) && stored >= 20 && stored <= 100) return stored;
@@ -36,9 +62,19 @@ function readSavedOpacityPct() {
   return 100;
 }
 
-function applyEarlyThemeClass(activeTheme) {
+function readSavedMuted() {
+  if (typeof storedSettings.muted === 'boolean') return storedSettings.muted;
+  try {
+    return localStorage.getItem(STORAGE_KEY_MUTED) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function applyEarlyThemeClass(activeTheme, themeDisabled) {
   const documentRoot = document.documentElement;
   if (!documentRoot) return;
+  if (themeDisabled) return;
 
   documentRoot.classList.add('tm-terminal-theme', `tm-theme-${activeTheme}`);
 }
@@ -84,12 +120,18 @@ function attachEarlyStyleWhenHeadExists(styleElement) {
 contextBridge.exposeInMainWorld('terminalMessengerBridge', {
   setWindowOpacityPct: (pct) => ipcRenderer.invoke('tm:set-opacity', pct),
   setWindowMuted: (muted) => ipcRenderer.invoke('tm:set-muted', muted),
-  toggleWindowMuted: () => ipcRenderer.invoke('tm:toggle-muted')
+  toggleWindowMuted: () => ipcRenderer.invoke('tm:toggle-muted'),
+  /* clone so renderer-side mutations can't mutate this preload's copy */
+  savedSettings: JSON.parse(JSON.stringify(storedSettings)),
+  saveSettings: (partial) => ipcRenderer.invoke('tm:save-settings', partial)
 });
 
+const themeDisabled = storedSettings.themeDisabled === true;
 const activeTheme = readSavedTheme() ?? 'green';
-applyEarlyThemeClass(activeTheme);
-attachEarlyStyleWhenHeadExists(buildEarlyStyleElement(activeTheme));
+applyEarlyThemeClass(activeTheme, themeDisabled);
+if (!themeDisabled) {
+  attachEarlyStyleWhenHeadExists(buildEarlyStyleElement(activeTheme));
+}
 
 /* re-apply persisted opacity early so the window doesn't flash to 100% then dim. */
 const savedOpacity = readSavedOpacityPct();
@@ -98,13 +140,6 @@ if (savedOpacity !== 100) {
 }
 
 /* re-apply persisted mute state so the window starts muted if we were muted. */
-function readSavedMuted() {
-  try {
-    return localStorage.getItem('terminalMessenger.muted') === 'true';
-  } catch {
-    return false;
-  }
-}
 if (readSavedMuted()) {
   ipcRenderer.invoke('tm:set-muted', true).catch(() => {});
 }

@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, session } = require('electron');
 const { loadAppConfig } = require('./shell/app-config');
 const { buildApplicationMenu } = require('./shell/application-menu');
 const { createMessengerWindow } = require('./shell/messenger-window');
+const { loadStoredSettings, saveStoredSettings } = require('./shell/settings-store');
 
 const SESSION_PARTITION = 'persist:terminal-messenger';
 const SAFE_PERMISSIONS = ['notifications', 'clipboard-read', 'clipboard-sanitized-write'];
@@ -9,6 +10,7 @@ const MIN_OPACITY_PCT = 20;
 const MAX_OPACITY_PCT = 100;
 
 const appConfig = loadAppConfig();
+let storedSettings = {};
 
 function configurePersistentSession() {
   const persistentSession = session.fromPartition(SESSION_PARTITION);
@@ -48,17 +50,24 @@ function registerIpcHandlers() {
     targetWindow.webContents.setAudioMuted(nextMuted);
     return nextMuted;
   });
+
+  ipcMain.handle('tm:save-settings', (_event, partial) => {
+    if (!partial || typeof partial !== 'object') return false;
+    storedSettings = { ...storedSettings, ...partial };
+    return saveStoredSettings(storedSettings);
+  });
 }
 
 app.whenReady().then(() => {
+  storedSettings = loadStoredSettings();
   buildApplicationMenu(appConfig);
   configurePersistentSession();
   registerIpcHandlers();
-  createMessengerWindow(appConfig, SESSION_PARTITION);
+  createMessengerWindow(appConfig, SESSION_PARTITION, storedSettings);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createMessengerWindow(appConfig, SESSION_PARTITION);
+      createMessengerWindow(appConfig, SESSION_PARTITION, storedSettings);
     }
   });
 });

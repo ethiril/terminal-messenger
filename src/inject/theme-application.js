@@ -76,6 +76,7 @@ function applyDocumentTheme() {
   tagActionButtons();
   tagActionToolbarWrappers();
   tagUltraLayoutTargets();
+  ensureLogVideoControls();
   unblockPasteOnInputs();
   updateStatuslineContent();
 }

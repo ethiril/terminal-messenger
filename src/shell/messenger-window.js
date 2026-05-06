@@ -38,8 +38,13 @@ function formatTitleWithUnreadCount(updatedTitle) {
   return unreadMatch ? `Messenger (${unreadMatch[1]})` : 'Messenger';
 }
 
-function createMessengerWindow(appConfig, sessionPartition) {
+function createMessengerWindow(appConfig, sessionPartition, storedSettings = {}) {
   const windowSize = appConfig.window ?? {};
+  /* additionalArguments lands in process.argv inside the sandboxed preload,
+     letting us hand persisted theme/opacity to the early-paint code without
+     a sync IPC round-trip. encoded as base64 so the JSON survives the
+     command-line tokeniser (quotes, spaces) intact. */
+  const encodedSettings = Buffer.from(JSON.stringify(storedSettings), 'utf8').toString('base64');
   const messengerWindow = new BrowserWindow({
     width: windowSize.width ?? 1280,
     height: windowSize.height ?? 860,
@@ -57,7 +62,8 @@ function createMessengerWindow(appConfig, sessionPartition) {
       sandbox: true,
       spellcheck: true,
       partition: sessionPartition,
-      preload: PRELOAD_SCRIPT_PATH
+      preload: PRELOAD_SCRIPT_PATH,
+      additionalArguments: [`--tm-stored-settings=${encodedSettings}`]
     }
   });
 

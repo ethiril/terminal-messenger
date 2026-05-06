@@ -44,12 +44,28 @@ function readStoredOpacityPct() {
   return null;
 }
 
+/* settings come from three places, in priority order:
+   1. file-backed userData/user-settings.json (handed in via the bridge)
+   2. localStorage (legacy / fast cache for early-paint)
+   3. config/app.json + hard-coded defaults
+   the file wins because it survives partition resets and explicit cache
+   clears - localStorage on a `persist:` partition can still be wiped. */
 function loadInitialSettings(userConfig) {
-  const savedTheme = readStoredString(STORAGE_KEYS.theme);
-  const savedUltra = readStoredBoolean(STORAGE_KEYS.ultra);
-  const savedOpacity = readStoredOpacityPct();
-  const savedMuted = readStoredBoolean(STORAGE_KEYS.muted);
-  const savedDisabled = readStoredBoolean(STORAGE_KEYS.themeDisabled);
+  const fileSettings = (window.terminalMessengerBridge?.savedSettings) ?? {};
+
+  const savedTheme = fileSettings.theme ?? readStoredString(STORAGE_KEYS.theme);
+  const savedUltra = typeof fileSettings.ultra === 'boolean'
+    ? fileSettings.ultra
+    : readStoredBoolean(STORAGE_KEYS.ultra);
+  const savedOpacity = Number.isFinite(fileSettings.opacityPct)
+    ? fileSettings.opacityPct
+    : readStoredOpacityPct();
+  const savedMuted = typeof fileSettings.muted === 'boolean'
+    ? fileSettings.muted
+    : readStoredBoolean(STORAGE_KEYS.muted);
+  const savedDisabled = typeof fileSettings.themeDisabled === 'boolean'
+    ? fileSettings.themeDisabled
+    : readStoredBoolean(STORAGE_KEYS.themeDisabled);
 
   return {
     theme: VALID_THEMES.includes(savedTheme) ? savedTheme : normaliseTheme(userConfig.theme),
@@ -61,6 +77,9 @@ function loadInitialSettings(userConfig) {
 }
 
 function persistSettings(settings) {
+  /* localStorage stays as a synchronous mirror so preload's early-paint can
+     still read theme/opacity without waiting on disk. the JSON file (via
+     bridge.saveSettings) is the durable source of truth across sessions. */
   try {
     localStorage.setItem(STORAGE_KEYS.theme, settings.theme);
     localStorage.setItem(STORAGE_KEYS.ultra, String(settings.ultra));
@@ -69,5 +88,18 @@ function persistSettings(settings) {
     localStorage.setItem(STORAGE_KEYS.themeDisabled, String(settings.themeDisabled));
   } catch {
     // localStorage may be unavailable (private mode, quota exceeded); ignore.
+  }
+
+  const bridge = window.terminalMessengerBridge;
+  if (bridge?.saveSettings) {
+    bridge.saveSettings({
+      theme: settings.theme,
+      ultra: settings.ultra,
+      opacityPct: settings.opacityPct,
+      muted: settings.muted,
+      themeDisabled: settings.themeDisabled
+    }).catch((error) => {
+      console.error('Could not persist settings:', error);
+    });
   }
 }

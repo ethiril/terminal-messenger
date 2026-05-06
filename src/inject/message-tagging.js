@@ -290,40 +290,119 @@ function tagTypingIndicators() {
     }
   }
 
+  /* match only typing-status phrases ("X is typing...", "is writing"), never
+     a bare "typing" substring - a user message like "typing now" lands inside
+     the row's aria-label and would otherwise get the row swapped for "...". */
   const labelHits = document.querySelectorAll(
-    '[role="log"] [aria-label*="typing" i]:not([data-tm-typing-indicator]),'
-    + '[data-tm-thread] [aria-label*="typing" i]:not([data-tm-typing-indicator]),'
+    '[role="log"] [aria-label*="is typing" i]:not([data-tm-typing-indicator]),'
+    + '[data-tm-thread] [aria-label*="is typing" i]:not([data-tm-typing-indicator]),'
     + '[role="log"] [aria-label*="is writing" i]:not([data-tm-typing-indicator]),'
-    + '[data-tm-thread] [aria-label*="is writing" i]:not([data-tm-typing-indicator])'
+    + '[data-tm-thread] [aria-label*="is writing" i]:not([data-tm-typing-indicator]),'
+    + '[role="log"] [aria-label="Typing indicator" i]:not([data-tm-typing-indicator]),'
+    + '[data-tm-thread] [aria-label="Typing indicator" i]:not([data-tm-typing-indicator])'
   );
   for (const hit of labelHits) {
     hit.setAttribute('data-tm-typing-indicator', 'true');
   }
 
-  /* fallback for fb builds that don't expose a typing aria-label: the typing
-     bubble is always rendered as the last row of the log, has no visible
-     text, and contains only decorative svg/img dots. restrict the heuristic
-     to the final row so day-separators or read-receipt rows mid-feed don't
-     accidentally get swapped for "..." */
+  /* primary fallback for builds without a typing aria-label: in current
+     fb messenger the typing bubble renders as
+        <div role="presentation">         ← the bubble (50×17ish)
+          <div role="list">               ← container of dots
+            <div role="listitem"> dot </div>
+            <div role="listitem"> dot </div>
+            <div role="listitem"> dot </div>
+     none of those carry an aria-label or live-region marker, but a no-text
+     [role="list"] inside a chat log is essentially unique to this widget
+     (real lists carry text; reactions/toolbar use other roles). tag the
+     enclosing role="presentation" so our CSS replaces the whole bubble
+     with "...", and fall back to the list itself if no presentation
+     wrapper is in scope. */
+  const dotLists = document.querySelectorAll(
+    '[role="log"] [role="list"]:not([data-tm-typing-indicator]),'
+    + ' [data-tm-thread] [role="list"]:not([data-tm-typing-indicator])'
+  );
+  for (const list of dotLists) {
+    if ((list.textContent ?? '').trim().length > 0) continue;
+    const rect = list.getBoundingClientRect();
+    if (rect.height === 0 || rect.width === 0 || rect.height > 80) continue;
+    const presentationWrapper = list.closest(
+      '[role="log"] [role="presentation"], [data-tm-thread] [role="presentation"]'
+    );
+    const target = presentationWrapper && !presentationWrapper.hasAttribute('data-tm-typing-indicator')
+      ? presentationWrapper
+      : list;
+    target.setAttribute('data-tm-typing-indicator', 'true');
+  }
+
+  /* secondary fallback: scan candidates from the bottom of the log for
+     no-text rows. covers older / alternative fb builds where the typing
+     slot lives in a role="row" or as a direct child of the log without
+     the role="list" pattern. */
   const logs = document.querySelectorAll('[role="log"], [data-tm-thread]');
   for (const log of logs) {
-    const rows = log.querySelectorAll(':scope [role="row"]');
-    const lastRow = rows[rows.length - 1];
-    if (!lastRow || lastRow.hasAttribute('data-tm-typing-indicator')) continue;
-    if ((lastRow.textContent ?? '').trim().length > 0) continue;
-    const hasDecorative = lastRow.querySelector('svg, i[data-visualcompletion="css-img"], img');
-    if (!hasDecorative) continue;
-    lastRow.setAttribute('data-tm-typing-indicator', 'true');
+    const candidates = collectTypingIndicatorCandidates(log);
+    for (const candidate of candidates) {
+      if (candidate.hasAttribute('data-tm-typing-indicator')) continue;
+      if ((candidate.textContent ?? '').trim().length > 0) continue;
+      const rect = candidate.getBoundingClientRect();
+      if (rect.height === 0 || rect.height > 80) continue;
+      if (rect.width === 0) continue;
+      candidate.setAttribute('data-tm-typing-indicator', 'true');
+    }
   }
+
+  /* third pass for builds where the indicator is a sibling of the log
+     rather than inside it. look for an aria-live region just below the
+     log/thread that has no text but is rendered - matches the typing-
+     status announcement pattern. */
+  for (const log of logs) {
+    const parent = log.parentElement;
+    if (!parent) continue;
+    const liveRegions = parent.querySelectorAll(
+      ':scope > [aria-live="polite"]:not([data-tm-typing-indicator]),'
+      + ':scope > * > [aria-live="polite"]:not([data-tm-typing-indicator])'
+    );
+    for (const region of liveRegions) {
+      if ((region.textContent ?? '').trim().length > 0) continue;
+      const rect = region.getBoundingClientRect();
+      if (rect.height === 0 || rect.height > 80) continue;
+      region.setAttribute('data-tm-typing-indicator', 'true');
+    }
+  }
+}
+
+/* gather likely typing-indicator hosts at the bottom of the log: the last
+   role=row/message descendant, plus the last rendered direct child (which
+   in some builds carries the indicator slot without any role markers). */
+function collectTypingIndicatorCandidates(log) {
+  const candidates = [];
+
+  const rows = log.querySelectorAll(
+    ':scope [role="row"], :scope [aria-roledescription="message"]'
+  );
+  if (rows.length > 0) candidates.push(rows[rows.length - 1]);
+
+  for (let i = log.children.length - 1; i >= 0; i--) {
+    const child = log.children[i];
+    const rect = child.getBoundingClientRect();
+    if (rect.height === 0) continue;
+    if (!candidates.includes(child)) candidates.push(child);
+    break;
+  }
+
+  return candidates;
 }
 
 function isStillTypingIndicator(element) {
   const ariaLabel = (element.getAttribute('aria-label') ?? '').toLowerCase();
-  if (/typing|is writing/.test(ariaLabel)) return true;
-  if (!element.matches('[role="row"]')) return false;
+  if (/is typing|is writing|^typing indicator$/.test(ariaLabel)) return true;
   const text = (element.textContent ?? '').trim();
   if (text.length > 0) return false;
-  return Boolean(element.querySelector('svg, i[data-visualcompletion="css-img"], img'));
+  const rect = element.getBoundingClientRect();
+  if (rect.height === 0 || rect.height > 80) return false;
+  if (rect.width === 0) return false;
+  return true;
 }
 
 function tagLinkPreviews() {
@@ -335,6 +414,7 @@ function tagLinkPreviews() {
     anchor.setAttribute('data-tm-link-preview-scanned', 'true');
     if (looksLikeLinkPreview(anchor)) {
       anchor.setAttribute('data-tm-link-preview', 'true');
+      tagLinkPreviewParts(anchor);
     }
   }
 }
@@ -353,4 +433,34 @@ function looksLikeLinkPreview(anchor) {
     if (textBlockChildCount >= 2) return true;
   }
   return false;
+}
+
+/* fb stacks the title + description as separate text-bearing blocks below
+   the thumbnail image, but our universal styling renders them at the same
+   weight/colour with no break - so "title (HD)Check out my..." runs into
+   one wall of text. walk the descendants in document order, treat the
+   first block-with-text as the title (bold/normal colour) and any
+   subsequent blocks as description (muted), so the card reads with the
+   same hierarchy as fb's native render. skips any subtree that contains
+   an image to avoid tagging the thumbnail's hidden alt-text wrapper. */
+function tagLinkPreviewParts(anchor) {
+  const seenContainers = new WeakSet();
+  let textBlockIndex = 0;
+  for (const block of anchor.querySelectorAll('div, span')) {
+    if (block.querySelector('img, picture, video, canvas')) continue;
+    const text = (block.textContent ?? '').trim();
+    if (text.length === 0) continue;
+    /* only tag the outermost text-bearing wrapper - descending into nested
+       spans would tag the same string multiple times and double-style it */
+    if (Array.from(seenContainers).some((container) => container.contains(block))) continue;
+    seenContainers.add(block);
+
+    if (textBlockIndex === 0) {
+      block.setAttribute('data-tm-link-title', 'true');
+    } else {
+      block.setAttribute('data-tm-link-desc', 'true');
+    }
+    textBlockIndex += 1;
+    if (textBlockIndex >= 4) break;
+  }
 }
