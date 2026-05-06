@@ -519,6 +519,42 @@ body.tm-terminal-theme [data-tm-has-reply] div:has(img[data-tm-img-size='large']
   margin-bottom: 0 !important;
 }
 
+/* per-image collapse toggle. inserted by message-tagging.js as the
+   sibling immediately preceding each large chat image. flex-basis:100%
+   forces it onto its own line in flex-row parents (fb's image wrapper
+   is sometimes a flex container); display:block handles non-flex
+   parents the same way. user-select:none so drag-selection over a
+   message doesn't paint the toggle text. */
+body.tm-terminal-theme [data-tm-img-collapse-toggle] {
+  display: block !important;
+  flex-basis: 100% !important;
+  order: -1 !important;
+  width: max-content !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 0 2px 0 !important;
+  font-family: inherit !important;
+  font-size: 11px !important;
+  color: var(--tm-muted) !important;
+  cursor: pointer !important;
+  text-align: left !important;
+  line-height: 1.2 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  letter-spacing: 0 !important;
+}
+
+body.tm-terminal-theme [data-tm-img-collapse-toggle]:hover,
+body.tm-terminal-theme [data-tm-img-collapse-toggle]:focus-visible {
+  color: var(--tm-accent) !important;
+  outline: none !important;
+}
+
+body.tm-terminal-theme img[data-tm-img-collapsed='true'] {
+  display: none !important;
+}
+
 body.tm-terminal-theme [role='log'] img[data-tm-img-size='small'] {
   width: 12px !important;
   height: 12px !important;
@@ -1231,17 +1267,28 @@ body.tm-terminal-theme [data-tm-typing-indicator] {
 }
 
 body.tm-terminal-theme [data-tm-typing-indicator]::after {
-  content: '. . .';
+  content: '...';
   display: inline-block !important;
   visibility: visible !important;
-  letter-spacing: 2px;
+  vertical-align: bottom;
+  white-space: pre;
+  overflow: hidden;
+  width: 3ch;
+  text-align: left;
+  letter-spacing: 0;
   color: var(--tm-muted) !important;
-  animation: tm-typing-pulse 1.2s ease-in-out infinite;
+  animation: tm-typing-dots 1.4s linear infinite;
 }
 
-@keyframes tm-typing-pulse {
-  0%, 100% { opacity: 0.45; }
-  50%      { opacity: 1; }
+/* progressive reveal: empty → "." → ".." → "..." → empty → repeat.
+   each step holds for ~25% of the cycle then jumps in 1% — fast enough
+   to read as a discrete step under linear timing. */
+@keyframes tm-typing-dots {
+  0%, 14%   { width: 0; }
+  15%, 39%  { width: 1ch; }
+  40%, 64%  { width: 2ch; }
+  65%, 89%  { width: 3ch; }
+  90%, 100% { width: 0; }
 }
 
 /* ─── inputs ─── */

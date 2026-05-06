@@ -71,6 +71,7 @@ function applyDocumentTheme() {
   tagMessageDirections();
   tagSmallLogImages();
   tagReplyQuotes();
+  tagImageCollapseToggles();
   tagLinkPreviews();
   tagTypingIndicators();
   tagActionButtons();

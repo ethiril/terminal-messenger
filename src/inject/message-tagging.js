@@ -87,6 +87,91 @@ function tagSmallLogImages() {
   }
 }
 
+/* insert a small terminal-style toggle ([v]/[>]) immediately before each
+   large chat image so the user can collapse images without losing the
+   message context. idempotency is checked against the live DOM (previous
+   sibling) rather than a flag attribute - if fb's react reconciliation
+   strips our button on a re-render, the next mutation pass re-adds it.
+
+   skipped scopes: reply-quote thumbnails (the toggle would dwarf the
+   ~80px preview), reaction badges, and any image inside a dialog/menu/
+   sidebar (those aren't user-shared photos in the conversation). */
+function tagImageCollapseToggles() {
+  const candidateImages = document.querySelectorAll(
+    '[role="log"] img[data-tm-img-size="large"],'
+    + ' [data-tm-thread] img[data-tm-img-size="large"]'
+  );
+  for (const img of candidateImages) {
+    if (img.closest('[data-tm-has-reply], [data-tm-reply-quote]')) continue;
+    if (isInsideReactionContainer(img)) continue;
+    if (img.closest('[role="dialog"], [aria-modal="true"], [role="menu"], [data-tm-chat-list]')) continue;
+
+    const previous = img.previousElementSibling;
+    if (previous && previous.hasAttribute('data-tm-img-collapse-toggle')) continue;
+
+    const parent = img.parentNode;
+    if (!parent) continue;
+
+    const isCollapsed = img.getAttribute('data-tm-img-collapsed') === 'true';
+    const toggle = buildImageCollapseToggle(isCollapsed);
+    parent.insertBefore(toggle, img);
+  }
+}
+
+function buildImageCollapseToggle(isCollapsed) {
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.setAttribute('data-tm-img-collapse-toggle', 'true');
+  applyImageCollapseToggleState(toggle, isCollapsed);
+  return toggle;
+}
+
+function applyImageCollapseToggleState(toggle, isCollapsed) {
+  if (isCollapsed) {
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-label', 'show image');
+    toggle.textContent = '[>] image';
+  } else {
+    toggle.setAttribute('aria-expanded', 'true');
+    toggle.setAttribute('aria-label', 'hide image');
+    toggle.textContent = '[v] image';
+  }
+}
+
+function handleImageCollapseClick(event) {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const toggle = target.closest('[data-tm-img-collapse-toggle]');
+  if (!toggle) return;
+  /* stopImmediatePropagation so the media-viewer's document-level click
+     handler (also capture phase) can't pick this click up as anything
+     else, and fb's own bubble click handlers stay quiet too. */
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+
+  let img = toggle.nextElementSibling;
+  while (img && img.tagName !== 'IMG') {
+    img = img.nextElementSibling;
+  }
+  if (!img) return;
+
+  const isNowCollapsed = img.getAttribute('data-tm-img-collapsed') !== 'true';
+  if (isNowCollapsed) {
+    img.setAttribute('data-tm-img-collapsed', 'true');
+  } else {
+    img.removeAttribute('data-tm-img-collapsed');
+  }
+  applyImageCollapseToggleState(toggle, isNowCollapsed);
+}
+
+let imageCollapseHandlerBound = false;
+function bindImageCollapseHandler() {
+  if (imageCollapseHandlerBound) return;
+  imageCollapseHandlerBound = true;
+  document.addEventListener('click', handleImageCollapseClick, true);
+}
+
 function isActionButtonLabel(label) {
   const trimmed = label.trim();
   if (!trimmed) return false;

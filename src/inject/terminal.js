@@ -251,6 +251,7 @@ function start() {
   applyWindowMuted(settings.muted);
   bindKeyboardShortcuts();
   bindMediaViewerEvents();
+  bindImageCollapseHandler();
   bindMessageFocusReleaser();
   bindManualSelectionDriver();
   startMutationObserver();
