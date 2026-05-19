@@ -3,6 +3,10 @@ const { contextBridge, ipcRenderer } = require('electron');
 const STORAGE_KEY_THEME = 'terminalMessenger.theme';
 const STORAGE_KEY_OPACITY = 'terminalMessenger.opacity';
 const STORAGE_KEY_MUTED = 'terminalMessenger.muted';
+/* keep in sync with shell/settings-store.js VALID_THEMES and
+   inject/settings.js VALID_THEMES. preload runs in a sandboxed renderer
+   and can't require() arbitrary local modules, so this list is duplicated
+   on purpose. */
 const VALID_THEMES = ['green', 'amber', 'cyan', 'mono', 'mocha', 'twilight', 'neon', 'macchiato', 'frappe', 'latte'];
 const STORED_SETTINGS_FLAG = '--tm-stored-settings=';
 

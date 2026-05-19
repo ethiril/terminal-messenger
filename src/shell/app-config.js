@@ -41,7 +41,10 @@ function isAllowedMessengerUrl(candidateUrl, allowedHosts) {
     return false;
   }
 
-  if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') return false;
+  /* https-only: fb's web app is always served over tls, and accepting http:
+     here would let a downgrade attack (rogue proxy, captive portal) get fb-
+     scoped URLs loaded inside the app window. */
+  if (parsedUrl.protocol !== 'https:') return false;
 
   return allowedHosts.some((allowedHost) =>
     parsedUrl.hostname === allowedHost || parsedUrl.hostname.endsWith(`.${allowedHost}`)

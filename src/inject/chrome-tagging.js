@@ -57,6 +57,10 @@ function tagChatHeader() {
 function tagThreadIntroCard() {
   const mainElement = document.querySelector('[role="main"]');
   if (!mainElement) return;
+  /* early-out: after the first successful tag the placard is already
+     hidden by CSS. re-scanning span/div/a across [role='main'] (often
+     thousands of nodes) on every apply pass was pure overhead. */
+  if (mainElement.querySelector('[data-tm-thread-intro]')) return;
   const messageLog = mainElement.querySelector('[role="log"]');
 
   const candidates = mainElement.querySelectorAll('span, div, a');
@@ -102,20 +106,123 @@ function tagChatList() {
    [data-tm-chat-list] grid, so chat-list avatar styling never reaches them
    and the natural-size avatars come through as broken letter-blocks. find
    any container holding such "external" chat anchors and tag it so CSS can
-   suppress its imagery without touching the regular chat list. */
+   suppress its imagery without touching the regular chat list.
+
+   only tag a dialog/listbox/menu if it contains MULTIPLE /t/ anchors -
+   a one-off /t/ link inside an unrelated modal (e.g. thread-details with
+   a single shortcut to the chat) would otherwise lose all imagery in
+   that modal. results popovers always carry many anchors at once. */
 function tagSearchResultsDropdown() {
   const externalChatLinks = document.querySelectorAll('a[role="link"][href*="/t/"]');
+  const scopeCounts = new Map();
+  const linksWithoutScope = [];
   for (const link of externalChatLinks) {
     if (link.closest('[data-tm-chat-list]')) continue;
     if (link.closest('[role="log"], [data-tm-thread]')) continue;
 
-    /* prefer tagging the popover so a single attribute covers every result
-       row; fall back to the link itself when fb renders results without a
-       popover wrapper, which still hides each row's avatar individually. */
-    const scope = link.closest('[role="dialog"], [role="listbox"], [role="menu"]') ?? link;
+    const scope = link.closest('[role="dialog"], [role="listbox"], [role="menu"]');
+    if (scope) {
+      scopeCounts.set(scope, (scopeCounts.get(scope) ?? 0) + 1);
+    } else {
+      linksWithoutScope.push(link);
+    }
+  }
+
+  for (const [scope, count] of scopeCounts) {
+    if (count < 2) continue;
     if (scope.hasAttribute('data-tm-search-results')) continue;
     scope.setAttribute('data-tm-search-results', 'true');
   }
+
+  /* unwrapped result rows: tag the link itself, which still suppresses its
+     own avatar without affecting unrelated imagery elsewhere. */
+  for (const link of linksWithoutScope) {
+    if (link.hasAttribute('data-tm-search-results')) continue;
+    link.setAttribute('data-tm-search-results', 'true');
+  }
+}
+
+/* tag the wrapper directly around the composer's contenteditable so CSS
+   can render a "❯ " prompt prefix via ::before. picked the parent rather
+   than the contenteditable itself because fb's "Aa" placeholder is a real
+   DOM overlay (lexical-style absolute-positioned sibling), not a pseudo
+   element - replacing the contenteditable's pseudo wouldn't catch it. */
+function tagComposerHost() {
+  const composerInput = findFirstMatchingElement(COMPOSER_INPUT_SELECTORS);
+  if (!composerInput) return;
+  const host = composerInput.parentElement;
+  if (!host) return;
+  if (host.hasAttribute('data-tm-composer-host')) return;
+  document.querySelectorAll('[data-tm-composer-host]')
+    .forEach((node) => node.removeAttribute('data-tm-composer-host'));
+  host.setAttribute('data-tm-composer-host', 'true');
+}
+
+/* tag fb's "Aa" placeholder so CSS can shift it past the chevron column.
+   it's rendered as an absolute-positioned, pointer-events:none overlay
+   that ignores padding-left on the contenteditable - hence the visible
+   overlap when the composer is empty. detection heuristic: any descendant
+   of the composer host that isn't the textbox, has short text content,
+   and has computed pointer-events:none. */
+function tagComposerPlaceholder() {
+  const host = document.querySelector('[data-tm-composer-host]');
+  if (!host) return;
+  const textbox = host.querySelector('[contenteditable="true"], [role="textbox"]');
+  if (!textbox) return;
+
+  for (const stale of host.querySelectorAll('[data-tm-composer-placeholder]')) {
+    stale.removeAttribute('data-tm-composer-placeholder');
+  }
+
+  for (const candidate of host.querySelectorAll('*')) {
+    if (candidate === textbox) continue;
+    if (textbox.contains(candidate)) continue;
+    if (candidate.contains(textbox)) continue;
+    const text = (candidate.textContent ?? '').trim();
+    if (text.length === 0 || text.length > 12) continue;
+    const style = window.getComputedStyle(candidate);
+    if (style.pointerEvents !== 'none') continue;
+    candidate.setAttribute('data-tm-composer-placeholder', 'true');
+  }
+}
+
+/* mark chat-list rows that look unread so the :filter command can hide
+   everything else. fb encodes unread in several places:
+   - aria-label includes "unread"
+   - row contains a text/numeric badge whose accessible name carries
+     "unread"
+   - row's preview text is rendered in bold (heuristic: an inner span
+     with font-weight >= 600 via inline style)
+   re-evaluated every apply pass because fb mutates rows in place when
+   they go from read→unread without unmounting them. */
+function tagChatListUnread() {
+  const chatLists = document.querySelectorAll('[data-tm-chat-list]');
+  for (const chatList of chatLists) {
+    const rows = chatList.querySelectorAll('[role="row"]');
+    let unreadCount = 0;
+    for (const row of rows) {
+      const isUnread = chatRowLooksUnread(row);
+      if (isUnread) {
+        row.setAttribute('data-tm-unread', 'true');
+        unreadCount += 1;
+      } else {
+        row.removeAttribute('data-tm-unread');
+      }
+    }
+    /* mirror the visible-unread count onto the grid so CSS can render it
+       inside the filter banner via attr(). zero stays as "0" rather than
+       being removed so the banner doesn't visibly flicker when the count
+       drops to zero. */
+    chatList.setAttribute('data-tm-unread-count', String(unreadCount));
+  }
+}
+
+function chatRowLooksUnread(row) {
+  const ariaLabel = (row.getAttribute('aria-label') ?? '').toLowerCase();
+  if (/\bunread\b|\bnot read\b/.test(ariaLabel)) return true;
+  const inner = row.querySelector('[aria-label*="unread" i], [aria-label*="not read" i]');
+  if (inner) return true;
+  return false;
 }
 
 function tagUltraLayoutTargets() {

@@ -87,55 +87,166 @@ function tagSmallLogImages() {
   }
 }
 
-/* insert a small terminal-style toggle ([v]/[>]) immediately before each
-   large chat image so the user can collapse images without losing the
-   message context. idempotency is checked against the live DOM (previous
-   sibling) rather than a flag attribute - if fb's react reconciliation
-   strips our button on a re-render, the next mutation pass re-adds it.
+/* boundaries we never cross when walking up from the img - hitting one of
+   these means we've reached the message row, and collapsing past it would
+   hide unrelated content (sender, timestamp, reply quote, etc.). */
+const IMAGE_WRAPPER_BOUNDARY_SELECTOR =
+  '[role="row"], [role="article"], [aria-roledescription="message"],'
+  + ' [data-tm-direction], [data-tm-has-reply]';
+
+/* a sibling counts as "meaningful" - and blocks the walk - if it contains
+   visible text or a separate media unit (img/svg/iframe). structural-only
+   divs (positioning helpers, hover overlays) are safe to pass.
+
+   video/canvas/picture are deliberately NOT blocking: fb renders GIFs as
+   an <img> poster + an overlaid <video> sibling in the same slot, so we
+   need to walk past the video sibling to reach the slot-keeping wrapper
+   above. img/svg stay blocking because separate <img> siblings represent
+   distinct media units (carousels, reactions) we shouldn't unify. */
+function hasMeaningfulContent(element) {
+  if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
+  if (element.hasAttribute('data-tm-img-collapse-toggle')) return false;
+  const text = element.textContent;
+  if (text && text.trim().length > 0) return true;
+  if (element.matches('img, svg, iframe')) return true;
+  if (element.querySelector('img, svg, iframe')) return true;
+  return false;
+}
+
+/* a "slot keeper" is an ancestor with inline sizing that holds the image's
+   layout box open even after the <img> is hidden - aspect-ratio, percentage
+   padding-top/bottom (the classic aspect-ratio hack), or fixed/min height.
+   we detect those via inline style only since computed styles resolve all
+   units to px and lose the distinguishing signal. */
+function isImageSlotKeeper(element) {
+  if (!element || !element.style) return false;
+  const style = element.style;
+  if (style.aspectRatio && style.aspectRatio !== 'auto' && style.aspectRatio !== '') return true;
+  if (style.paddingTop && /%$/.test(style.paddingTop)) return true;
+  if (style.paddingBottom && /%$/.test(style.paddingBottom)) return true;
+  if (style.height && style.height !== 'auto' && style.height !== '0px' && style.height !== '') return true;
+  if (style.minHeight && style.minHeight !== '0' && style.minHeight !== '0px' && style.minHeight !== '') return true;
+  return false;
+}
+
+/* walk up from the img collecting the highest slot-keeping ancestor whose
+   siblings are all structural-only (no text, no other media). that's the
+   element we'll hide - hiding only the <img> leaves any aspect-ratio
+   ancestor occupying its full slot. cap at the message-row boundary so we
+   never hide unrelated content (sender, timestamp, reply quote). */
+function findImageWrapper(img) {
+  let node = img;
+  let lastSlotKeeper = null;
+  while (node.parentElement && !node.parentElement.matches(IMAGE_WRAPPER_BOUNDARY_SELECTOR)) {
+    const parent = node.parentElement;
+    let blocked = false;
+    for (const child of parent.childNodes) {
+      if (child === node) continue;
+      if (child.nodeType === Node.TEXT_NODE) {
+        if (child.textContent && child.textContent.trim().length > 0) {
+          blocked = true;
+          break;
+        }
+        continue;
+      }
+      if (child.nodeType === Node.ELEMENT_NODE && hasMeaningfulContent(child)) {
+        blocked = true;
+        break;
+      }
+    }
+    if (blocked) break;
+    if (isImageSlotKeeper(parent)) lastSlotKeeper = parent;
+    node = parent;
+  }
+  return lastSlotKeeper || node;
+}
+
+/* per-img toggle handle, used as the idempotency check on each mutation
+   pass. WeakMap so a removed <img> is gc'd along with its toggle ref. */
+const imageCollapseTogglesByImg = new WeakMap();
+/* toggle -> wrapper ref so the click handler doesn't depend on DOM
+   adjacency (fb's reconciliation can insert siblings between the toggle
+   and the wrapper, breaking nextElementSibling lookup). */
+const wrappersByToggle = new WeakMap();
+
+/* insert a small terminal-style toggle immediately before each large chat
+   image's wrapper so the user can collapse images (slot included) without
+   losing the message context. idempotency: a WeakMap binds each <img> to
+   its toggle - if the toggle is still .isConnected we skip; otherwise (fb
+   reconciliation stripped it) we re-insert at the now-current wrapper.
 
    skipped scopes: reply-quote thumbnails (the toggle would dwarf the
    ~80px preview), reaction badges, and any image inside a dialog/menu/
-   sidebar (those aren't user-shared photos in the conversation). */
+   sidebar (those aren't user-shared photos in the conversation).
+
+   for multi-image bubbles fb almost always wraps each img in its own
+   slot-keeping ancestor, so findImageWrapper returns a separate wrapper
+   per img and each gets its own toggle. when fb does collapse multiple
+   imgs into a shared wrapper, the Map below dedupes so only one toggle
+   is emitted. label reads "video" for video posters (the click promotes
+   the underlying <video> into the viewer) and "image" otherwise. */
 function tagImageCollapseToggles() {
   const candidateImages = document.querySelectorAll(
     '[role="log"] img[data-tm-img-size="large"],'
     + ' [data-tm-thread] img[data-tm-img-size="large"]'
   );
+
+  const wrapperGroups = new Map();
   for (const img of candidateImages) {
     if (img.closest('[data-tm-has-reply], [data-tm-reply-quote]')) continue;
     if (isInsideReactionContainer(img)) continue;
     if (img.closest('[role="dialog"], [aria-modal="true"], [role="menu"], [data-tm-chat-list]')) continue;
 
-    const previous = img.previousElementSibling;
-    if (previous && previous.hasAttribute('data-tm-img-collapse-toggle')) continue;
+    const wrapper = findImageWrapper(img);
+    if (!wrapper.parentNode) continue;
 
-    const parent = img.parentNode;
-    if (!parent) continue;
+    const existing = wrapperGroups.get(wrapper);
+    if (existing) {
+      existing.imgs.push(img);
+    } else {
+      wrapperGroups.set(wrapper, { imgs: [img], isVideoPoster: Boolean(findVideoForPosterImage(img)) });
+    }
+  }
 
-    const isCollapsed = img.getAttribute('data-tm-img-collapsed') === 'true';
-    const toggle = buildImageCollapseToggle(isCollapsed);
-    parent.insertBefore(toggle, img);
+  for (const [wrapper, group] of wrapperGroups) {
+    const firstImg = group.imgs[0];
+    const existingToggle = imageCollapseTogglesByImg.get(firstImg);
+    if (existingToggle && existingToggle.isConnected) continue;
+
+    const wrapperParent = wrapper.parentNode;
+    if (!wrapperParent) continue;
+
+    const isCollapsed = wrapper.getAttribute('data-tm-img-wrapper-collapsed') === 'true'
+      || firstImg.getAttribute('data-tm-img-collapsed') === 'true';
+    const mediaKind = group.isVideoPoster ? 'video' : 'image';
+    const toggle = buildImageCollapseToggle(isCollapsed, mediaKind);
+    wrapperParent.insertBefore(toggle, wrapper);
+    wrappersByToggle.set(toggle, wrapper);
+    for (const img of group.imgs) imageCollapseTogglesByImg.set(img, toggle);
   }
 }
 
-function buildImageCollapseToggle(isCollapsed) {
+function buildImageCollapseToggle(isCollapsed, mediaKind = 'image') {
   const toggle = document.createElement('button');
   toggle.type = 'button';
   toggle.setAttribute('data-tm-img-collapse-toggle', 'true');
+  toggle.setAttribute('data-tm-img-collapse-kind', mediaKind);
   applyImageCollapseToggleState(toggle, isCollapsed);
   return toggle;
 }
 
 function applyImageCollapseToggleState(toggle, isCollapsed) {
-  if (isCollapsed) {
-    toggle.setAttribute('aria-expanded', 'false');
-    toggle.setAttribute('aria-label', 'show image');
-    toggle.textContent = '[>] image';
-  } else {
-    toggle.setAttribute('aria-expanded', 'true');
-    toggle.setAttribute('aria-label', 'hide image');
-    toggle.textContent = '[v] image';
-  }
+  const mediaKind = toggle.getAttribute('data-tm-img-collapse-kind') || 'image';
+  toggle.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+  toggle.setAttribute('aria-label', isCollapsed ? `show ${mediaKind}` : `hide ${mediaKind}`);
+  toggle.textContent = '';
+  const indicator = document.createElement('span');
+  indicator.className = 'tm-img-toggle-indicator';
+  indicator.textContent = isCollapsed ? '[+]' : '[-]';
+  const label = document.createElement('span');
+  label.className = 'tm-img-toggle-label';
+  label.textContent = isCollapsed ? `${mediaKind} hidden` : mediaKind;
+  toggle.append(indicator, label);
 }
 
 function handleImageCollapseClick(event) {
@@ -150,16 +261,29 @@ function handleImageCollapseClick(event) {
   event.stopPropagation();
   event.stopImmediatePropagation();
 
-  let img = toggle.nextElementSibling;
-  while (img && img.tagName !== 'IMG') {
-    img = img.nextElementSibling;
-  }
+  /* wrapper ref is stored at insertion time. fall back to nextElementSibling
+     only if the ref is missing or detached (e.g. user re-loaded into the
+     same page and the WeakMap is fresh but the DOM is reused). */
+  let wrapper = wrappersByToggle.get(toggle);
+  if (!wrapper || !wrapper.isConnected) wrapper = toggle.nextElementSibling;
+  if (!wrapper) return;
+  const img = wrapper.tagName === 'IMG' ? wrapper : wrapper.querySelector('img');
   if (!img) return;
 
-  const isNowCollapsed = img.getAttribute('data-tm-img-collapsed') !== 'true';
+  const isNowCollapsed = wrapper.getAttribute('data-tm-img-wrapper-collapsed') !== 'true';
   if (isNowCollapsed) {
+    wrapper.setAttribute('data-tm-img-wrapper-collapsed', 'true');
+    /* collapse every img the toggle covers (multi-image stacks) so the
+       individual img-level state stays in sync with the wrapper. */
+    for (const innerImg of wrapper.querySelectorAll('img')) {
+      innerImg.setAttribute('data-tm-img-collapsed', 'true');
+    }
     img.setAttribute('data-tm-img-collapsed', 'true');
   } else {
+    wrapper.removeAttribute('data-tm-img-wrapper-collapsed');
+    for (const innerImg of wrapper.querySelectorAll('img')) {
+      innerImg.removeAttribute('data-tm-img-collapsed');
+    }
     img.removeAttribute('data-tm-img-collapsed');
   }
   applyImageCollapseToggleState(toggle, isNowCollapsed);
@@ -238,14 +362,26 @@ function looksLikeIconOnlyAction(button) {
 }
 
 /* tag the wrapper only when at least one direct child is a tagged action
-   button - prevents tagging reaction-badge wrappers by accident */
+   button - prevents tagging reaction-badge wrappers by accident.
+
+   anchored upward from each tagged button: parentElement.parentElement
+   covers fb's typical toolbar layout (button > flex-wrap > toolbar), with
+   a short bounded walk for variants. previously this scanned every div in
+   every row on every apply pass, which dominated CPU on large logs. */
 function tagActionToolbarWrappers() {
-  const rows = document.querySelectorAll('[role="log"] [role="row"], [data-tm-thread] [role="row"]');
-  for (const row of rows) {
-    const wrappers = row.querySelectorAll('div:not([data-tm-action-toolbar])');
-    for (const wrapper of wrappers) {
-      if (!hasTaggedActionButtonChild(wrapper)) continue;
-      wrapper.setAttribute('data-tm-action-toolbar', 'true');
+  const taggedButtons = document.querySelectorAll(
+    '[role="log"] [data-tm-action-button], [data-tm-thread] [data-tm-action-button]'
+  );
+  const seen = new Set();
+  for (const button of taggedButtons) {
+    let candidate = button.parentElement;
+    for (let depth = 0; candidate && depth < 3; depth += 1, candidate = candidate.parentElement) {
+      if (seen.has(candidate)) break;
+      seen.add(candidate);
+      if (candidate.hasAttribute('data-tm-action-toolbar')) break;
+      if (!hasTaggedActionButtonChild(candidate)) continue;
+      candidate.setAttribute('data-tm-action-toolbar', 'true');
+      break;
     }
   }
 }
@@ -488,6 +624,130 @@ function isStillTypingIndicator(element) {
   if (rect.height === 0 || rect.height > 80) return false;
   if (rect.width === 0) return false;
   return true;
+}
+
+/* fb hides the per-message timestamp in a hover tooltip that we've
+   killed via [role='tooltip'] { display: none }. extract the time from
+   the message's aria-label and render it inline as a faint trailing
+   tag, so each message carries its own wallclock. idempotent via a
+   child check rather than a flag attribute - if fb's reconciliation
+   strips our span, the next apply pass re-adds it. */
+function tagMessageTimestamps() {
+  const messages = document.querySelectorAll(
+    '[role="log"] [aria-roledescription="message"],'
+    + ' [data-tm-thread] [aria-roledescription="message"]'
+  );
+  for (const message of messages) {
+    if (message.querySelector(':scope > [data-tm-msg-timestamp]')) continue;
+    const time = extractMessageTime(message);
+    if (!time) continue;
+    const node = document.createElement('span');
+    node.setAttribute('data-tm-msg-timestamp', 'true');
+    /* aria-hidden because the timestamp is already encoded in the
+       message's aria-label - duplicating it for assistive tech would
+       just produce noise. */
+    node.setAttribute('aria-hidden', 'true');
+    node.textContent = time;
+    message.appendChild(node);
+  }
+}
+
+function extractMessageTime(message) {
+  const sources = [message.getAttribute('aria-label') ?? ''];
+  const inner = message.querySelector('[aria-label*=":"]');
+  if (inner) sources.push(inner.getAttribute('aria-label') ?? '');
+  for (const text of sources) {
+    const match = text.match(/(\d{1,2}:\d{2})(?:\s*(am|pm))?/i);
+    if (!match) continue;
+    const base = match[1];
+    const meridian = match[2]?.toLowerCase();
+    return meridian ? `${base}${meridian}` : base;
+  }
+  return null;
+}
+
+/* extract host from the preview's href so CSS can prepend "[host] " to
+   the title. uses URL parsing rather than substring slicing because fb
+   wraps outbound links through a lm.facebook.com redirect with the real
+   URL in a `u=` query parameter. */
+function tagLinkPreviewHosts() {
+  const anchors = document.querySelectorAll('[data-tm-link-preview]');
+  for (const anchor of anchors) {
+    let host = anchor.getAttribute('data-tm-link-host');
+    if (!host) {
+      const href = anchor.getAttribute('href');
+      if (!href) continue;
+      host = resolveLinkPreviewHost(href);
+      if (host) anchor.setAttribute('data-tm-link-host', host);
+    }
+    /* mirror the host onto the title node so CSS `attr()` can read it
+       inside the ::before pseudo - attr() only resolves on the element
+       the pseudo is on, not on an ancestor. */
+    if (host) {
+      const titleNode = anchor.querySelector('[data-tm-link-title]');
+      if (titleNode && titleNode.getAttribute('data-tm-link-host') !== host) {
+        titleNode.setAttribute('data-tm-link-host', host);
+      }
+    }
+  }
+}
+
+function resolveLinkPreviewHost(href) {
+  try {
+    const url = new URL(href, document.baseURI);
+    /* fb wraps clicked links through l.facebook.com/l.php?u=<real-url>.
+       unwrap once so the host shown matches what the user is actually
+       opening, not the redirector. */
+    if (/(^|\.)facebook\.com$/i.test(url.host) && url.searchParams.has('u')) {
+      const inner = new URL(url.searchParams.get('u'));
+      return inner.host.replace(/^www\./, '');
+    }
+    return url.host.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+}
+
+/* tag fb's intra-log date/time headers so CSS can render them as
+   terminal-style "──── label ────" rules. fb usually uses an <h4> or
+   [role="separator"] without text on the row itself, but the label text
+   ("Today at 3:00 PM", "Sunday 10:00 AM", "Yesterday 14:22") lives in a
+   descendant or in the previous sibling. anchor on aria-label if present,
+   otherwise on direct text content; never tag inside a real message row. */
+function tagDaySeparators() {
+  const logs = document.querySelectorAll('[role="log"], [data-tm-thread]');
+  for (const log of logs) {
+    const candidates = log.querySelectorAll(
+      'h4:not([data-tm-day-separator]),'
+      + ' h5:not([data-tm-day-separator]),'
+      + ' [role="separator"]:not([data-tm-day-separator])'
+    );
+    for (const candidate of candidates) {
+      if (candidate.closest('[aria-roledescription="message"], [role="row"]')) continue;
+
+      const ariaLabel = (candidate.getAttribute('aria-label') ?? '').trim();
+      const text = (candidate.textContent ?? '').trim();
+      const label = ariaLabel || text;
+      if (!label || label.length > 80) continue;
+      if (!looksLikeDateLabel(label)) continue;
+
+      candidate.setAttribute('data-tm-day-separator', 'true');
+      /* surface label as a data attribute so CSS can render it via
+         attr() when the element has no own text (some fb builds keep
+         label only on aria). */
+      if (!text) candidate.setAttribute('data-tm-day-label', label);
+    }
+  }
+}
+
+function looksLikeDateLabel(text) {
+  const lower = text.toLowerCase();
+  if (/^(today|yesterday)\b/.test(lower)) return true;
+  if (/^(mon|tue|wed|thu|fri|sat|sun)/.test(lower)) return true;
+  if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\b/.test(lower)) return true;
+  if (/^\d{1,2}\/\d{1,2}(\/\d{2,4})?\b/.test(lower)) return true;
+  if (/^\d{1,2}:\d{2}\s*(am|pm)?$/i.test(lower)) return true;
+  return false;
 }
 
 function tagLinkPreviews() {

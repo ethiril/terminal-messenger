@@ -4,9 +4,15 @@ const { app } = require('electron');
 
 const SETTINGS_FILE_NAME = 'user-settings.json';
 
+/* keep in sync with preload.js VALID_THEMES and inject/settings.js
+   VALID_THEMES - see the comment in inject/settings.js for why these
+   three lists can't physically share a module. */
 const VALID_THEMES = ['green', 'amber', 'cyan', 'mono', 'mocha', 'twilight', 'neon', 'macchiato', 'frappe', 'latte'];
+const VALID_DENSITIES = ['compact', 'cozy', 'comfy'];
 const MIN_OPACITY_PCT = 20;
 const MAX_OPACITY_PCT = 100;
+const MIN_FONT_PX = 9;
+const MAX_FONT_PX = 18;
 
 const ALLOWED_KEYS = Object.freeze({
   theme: (value) => VALID_THEMES.includes(value),
@@ -14,7 +20,12 @@ const ALLOWED_KEYS = Object.freeze({
   themeDisabled: (value) => typeof value === 'boolean',
   muted: (value) => typeof value === 'boolean',
   opacityPct: (value) =>
-    Number.isFinite(value) && value >= MIN_OPACITY_PCT && value <= MAX_OPACITY_PCT
+    Number.isFinite(value) && value >= MIN_OPACITY_PCT && value <= MAX_OPACITY_PCT,
+  density: (value) => VALID_DENSITIES.includes(value),
+  fontSizePx: (value) =>
+    Number.isFinite(value) && value >= MIN_FONT_PX && value <= MAX_FONT_PX,
+  sentColor: (value) => typeof value === 'boolean',
+  chatListFilter: (value) => value === 'all' || value === 'unread'
 });
 
 function settingsFilePath() {

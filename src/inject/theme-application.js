@@ -50,11 +50,16 @@ function applyDocumentTheme() {
   for (const theme of VALID_THEMES) documentRoot.classList.remove(`tm-theme-${theme}`);
   documentRoot.classList.add(`tm-theme-${settings.theme}`);
 
+  documentRoot.style.setProperty('--tm-font-size', `${settings.fontSizePx}px`);
+  documentRoot.setAttribute('data-tm-density', settings.density);
+  documentRoot.setAttribute('data-tm-filter', settings.chatListFilter);
+
   const body = document.body;
   if (!body) return;
 
   body.classList.add('tm-terminal-theme');
   body.classList.toggle('tm-ultra', settings.ultra);
+  body.classList.toggle('tm-sent-color', settings.sentColor);
   /* statusline is appended to <html>, so the platform class has to live there
      too - the previous body-only flag never matched #tm-statusline */
   if (/Mac|iPhone|iPad/i.test(navigator.platform ?? '')) {
@@ -77,19 +82,43 @@ function applyDocumentTheme() {
   tagActionButtons();
   tagActionToolbarWrappers();
   tagUltraLayoutTargets();
+  tagComposerHost();
+  tagComposerPlaceholder();
+  tagDaySeparators();
+  tagMessageTimestamps();
+  tagLinkPreviewHosts();
+  tagChatListUnread();
   ensureLogVideoControls();
   unblockPasteOnInputs();
   updateStatuslineContent();
+  /* piggy-back on the apply pass to re-evaluate the jump-to-bottom
+     indicator and ultra composer height. avoids a forever-running poll. */
+  if (typeof runJumpBottomEvaluators === 'function') runJumpBottomEvaluators();
 }
 
+/* throttle re-application: fb mutates the DOM tens of times per second
+   when a thread is scrolling or a message is in flight. an unguarded
+   rAF schedule means applyDocumentTheme runs once per frame (~60Hz),
+   which is fine for visible work but burns the CPU on every chat-list
+   shuffle. cap to ~10x/s by enforcing a minimum interval between runs;
+   still rAF-aligned for paint timing. */
 let applyScheduled = false;
+let lastApplyAt = 0;
+const MIN_APPLY_INTERVAL_MS = 100;
+
 function scheduleApply() {
   if (applyScheduled) return;
   applyScheduled = true;
-  requestAnimationFrame(() => {
-    applyScheduled = false;
-    applyDocumentTheme();
-  });
+  const now = performance.now();
+  const elapsed = now - lastApplyAt;
+  const wait = elapsed >= MIN_APPLY_INTERVAL_MS ? 0 : (MIN_APPLY_INTERVAL_MS - elapsed);
+  setTimeout(() => {
+    requestAnimationFrame(() => {
+      applyScheduled = false;
+      lastApplyAt = performance.now();
+      applyDocumentTheme();
+    });
+  }, wait);
 }
 
 function setTheme(candidateTheme) {
@@ -161,4 +190,57 @@ function applyWindowMuted(muted) {
   bridge.setWindowMuted(muted).catch((error) => {
     console.error('Could not set window mute:', error);
   });
+}
+
+function setDensity(candidate) {
+  settings.density = normaliseDensity(candidate);
+  persistSettings(settings);
+  applyDocumentTheme();
+  showToast(`density=${settings.density}`);
+  return settings.density;
+}
+
+function setFontSizePx(rawPx) {
+  const clamped = clampFontPx(rawPx);
+  settings.fontSizePx = clamped;
+  persistSettings(settings);
+  applyDocumentTheme();
+  showToast(`fontsize=${clamped}`);
+  return clamped;
+}
+
+function bumpFontSizePx(delta) {
+  return setFontSizePx((settings.fontSizePx ?? DEFAULT_FONT_PX) + delta);
+}
+
+function setSentColor(enabled) {
+  settings.sentColor = Boolean(enabled);
+  persistSettings(settings);
+  applyDocumentTheme();
+  showToast(`sent-color=${settings.sentColor}`);
+  return settings.sentColor;
+}
+
+function toggleSentColor() {
+  return setSentColor(!settings.sentColor);
+}
+
+function setChatListFilter(candidate) {
+  const normalised = normaliseChatFilter(candidate);
+  settings.chatListFilter = normalised;
+  persistSettings(settings);
+  applyDocumentTheme();
+  showToast(`filter=${normalised}`);
+  return normalised;
+}
+
+function scrollLogToBottom() {
+  const log = document.querySelector('[role="log"], [data-tm-thread]');
+  if (!log) {
+    showToast('no log to scroll');
+    return false;
+  }
+  log.scrollTop = log.scrollHeight;
+  showToast('scrolled=bottom');
+  return true;
 }
