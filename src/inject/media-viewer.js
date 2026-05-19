@@ -18,7 +18,13 @@ function ensureMediaViewerRoot() {
     <div class="tm-media-viewer-frame">
       <div class="tm-media-viewer-header">
         <span class="tm-media-viewer-title">image</span>
-        <button class="tm-media-viewer-close" type="button" data-tm-media-action="close">close [esc]</button>
+        <span class="tm-media-viewer-status" data-tm-media-status></span>
+        <span class="tm-media-viewer-actions">
+          <button class="tm-media-viewer-prev" type="button" data-tm-media-action="prev" aria-label="previous">‹ prev</button>
+          <button class="tm-media-viewer-next" type="button" data-tm-media-action="next" aria-label="next">next ›</button>
+          <button class="tm-media-viewer-copy" type="button" data-tm-media-action="copy" aria-label="copy image url">copy</button>
+          <button class="tm-media-viewer-close" type="button" data-tm-media-action="close">close [esc]</button>
+        </span>
       </div>
       <div class="tm-media-viewer-body">
         <img class="tm-media-viewer-img" alt="">
@@ -32,9 +38,70 @@ function ensureMediaViewerRoot() {
     const target = event.target;
     const action = target instanceof Element ? target.getAttribute('data-tm-media-action') : null;
     if (action === 'close') closeMediaViewer();
+    else if (action === 'prev') stepMediaViewer(-1);
+    else if (action === 'next') stepMediaViewer(1);
+    else if (action === 'copy') copyMediaViewerImageUrl();
   });
 
+  const img = root.querySelector('.tm-media-viewer-img');
+  if (img) {
+    img.addEventListener('load', () => setMediaViewerStatus(''));
+    img.addEventListener('error', () => setMediaViewerStatus('failed to load'));
+  }
+
   return root;
+}
+
+function setMediaViewerStatus(message) {
+  const root = document.getElementById(MEDIA_VIEWER_ROOT_ID);
+  if (!root) return;
+  const statusNode = root.querySelector('[data-tm-media-status]');
+  if (statusNode) statusNode.textContent = message;
+}
+
+/* track which <img> opened the viewer so we can advance to its siblings
+   inside the same row/article. videos use the live-reparent path and don't
+   participate in arrow nav (each video's lifecycle is tied to fb's slot). */
+let currentViewerImage = null;
+
+function collectSiblingImages(seedImage) {
+  if (!seedImage) return [];
+  const scope = seedImage.closest('[aria-roledescription="message"], [role="row"], [role="article"]');
+  if (!scope) return [seedImage];
+  const candidates = scope.querySelectorAll('img[data-tm-img-size="large"]');
+  const result = [];
+  for (const candidate of candidates) {
+    if (!isClickableLogImage(candidate)) continue;
+    result.push(candidate);
+  }
+  return result.length ? result : [seedImage];
+}
+
+function stepMediaViewer(direction) {
+  if (!currentViewerImage) return;
+  const siblings = collectSiblingImages(currentViewerImage);
+  if (siblings.length < 2) return;
+  const currentIndex = siblings.indexOf(currentViewerImage);
+  const nextIndex = (currentIndex + direction + siblings.length) % siblings.length;
+  openMediaViewer(siblings[nextIndex]);
+}
+
+function copyMediaViewerImageUrl() {
+  const root = document.getElementById(MEDIA_VIEWER_ROOT_ID);
+  if (!root) return;
+  const img = root.querySelector('.tm-media-viewer-img');
+  const src = img?.getAttribute('src');
+  if (!src) { showToast('no image to copy'); return; }
+  /* navigator.clipboard.writeText returns a promise; if denied, fall back
+     to copying via a hidden textarea + execCommand for older flows. */
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(src).then(
+      () => showToast('copied image url'),
+      () => showToast('clipboard blocked')
+    );
+    return;
+  }
+  showToast('clipboard unavailable');
 }
 
 /* fb's video element is bound to a MediaSource/blob URL that can't be
@@ -71,10 +138,22 @@ function openMediaViewer(imgElement) {
   const src = resolveLargeImageSrc(imgElement);
   if (!src) return;
 
+  currentViewerImage = imgElement;
+  /* show "loading…" until the image's load event clears it. cleared on
+     error too so the user isn't left staring at a half-rendered viewer. */
+  setMediaViewerStatus('loading…');
   img.src = src;
   img.classList.remove('tm-media-viewer-hidden');
   const altText = imgElement.getAttribute('alt')?.trim();
   title.textContent = altText || 'image';
+
+  /* show prev/next only when the row holds multiple large images */
+  const siblings = collectSiblingImages(imgElement);
+  const hasSiblings = siblings.length > 1;
+  root.querySelector('.tm-media-viewer-prev')?.toggleAttribute('hidden', !hasSiblings);
+  root.querySelector('.tm-media-viewer-next')?.toggleAttribute('hidden', !hasSiblings);
+  root.querySelector('.tm-media-viewer-copy')?.removeAttribute('hidden');
+
   root.classList.add('tm-media-viewer-open');
 }
 
@@ -85,10 +164,17 @@ function openVideoInViewer(videoElement) {
   if (viewerVideoState && viewerVideoState.video !== videoElement) {
     restoreMovedVideo();
   }
+  currentViewerImage = null;
   const root = ensureMediaViewerRoot();
   const img = root.querySelector('.tm-media-viewer-img');
   const slot = root.querySelector('.tm-media-viewer-video-slot');
   const title = root.querySelector('.tm-media-viewer-title');
+
+  setMediaViewerStatus('');
+  /* prev/next/copy don't apply to videos */
+  root.querySelector('.tm-media-viewer-prev')?.setAttribute('hidden', '');
+  root.querySelector('.tm-media-viewer-next')?.setAttribute('hidden', '');
+  root.querySelector('.tm-media-viewer-copy')?.setAttribute('hidden', '');
 
   img.removeAttribute('src');
   img.classList.add('tm-media-viewer-hidden');
@@ -129,7 +215,6 @@ function restoreMovedVideo() {
   video.classList.remove('tm-media-viewer-active-video');
   video.controls = controls;
   video.muted = muted;
-  if (wasPaused) video.pause();
 
   if (parent && parent.isConnected) {
     try {
@@ -143,6 +228,12 @@ function restoreMovedVideo() {
     try { video.currentTime = currentTime; } catch {}
   }
 
+  /* mirror the original play/pause state. without the else-play branch, a
+     video the user had playing inline would silently stay paused after the
+     viewer closed - they'd think we broke playback. */
+  if (wasPaused) video.pause();
+  else video.play().catch(() => {});
+
   const slot = document.querySelector(`#${MEDIA_VIEWER_ROOT_ID} .tm-media-viewer-video-slot`);
   if (slot) slot.setAttribute('data-tm-media-empty', 'true');
 }
@@ -153,6 +244,8 @@ function closeMediaViewer() {
   root.classList.remove('tm-media-viewer-open');
   const img = root.querySelector('.tm-media-viewer-img');
   if (img) img.removeAttribute('src');
+  currentViewerImage = null;
+  setMediaViewerStatus('');
   restoreMovedVideo();
 }
 
@@ -203,20 +296,6 @@ function findVideoForPosterImage(imgElement) {
   return wrapper.querySelector('video');
 }
 
-/* fb's native controls bar carries the scrubber, mute, and fullscreen
-   buttons - clicks on those should pass through to the browser's video
-   handler, not yank the video into our viewer mid-interaction. only
-   intercept clicks on the video's own surface. */
-function isVideoControlsClick(target, video) {
-  if (!(target instanceof Element)) return false;
-  if (target === video) return false;
-  /* anything inside the video element's shadow DOM (controls bar) is
-     fielded by the browser and never reaches `target` as a normal
-     descendant - so a non-VIDEO target landing on the video means an
-     overlay (poster, play button) sitting in front of it. */
-  return false;
-}
-
 function handleDocumentClick(event) {
   const target = event.target;
   if (!(target instanceof Element)) return;
@@ -253,17 +332,33 @@ function handleDocumentClick(event) {
   }
 }
 
-function handleEscapeKey(event) {
-  if (event.key !== 'Escape') return;
+function handleViewerKeyboard(event) {
   if (!isMediaViewerOpen()) return;
-  closeMediaViewer();
-  event.preventDefault();
-  event.stopPropagation();
+  if (event.key === 'Escape') {
+    closeMediaViewer();
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+  /* arrow nav only meaningful when an image is the active subject - videos
+     keep their fb-owned controls and shouldn't be hijacked by arrow keys. */
+  if (!currentViewerImage) return;
+  if (event.key === 'ArrowLeft') {
+    stepMediaViewer(-1);
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+  if (event.key === 'ArrowRight') {
+    stepMediaViewer(1);
+    event.preventDefault();
+    event.stopPropagation();
+  }
 }
 
 function bindMediaViewerEvents() {
   if (mediaViewerBound) return;
   mediaViewerBound = true;
   document.addEventListener('click', handleDocumentClick, true);
-  document.addEventListener('keydown', handleEscapeKey, true);
+  document.addEventListener('keydown', handleViewerKeyboard, true);
 }

@@ -6,11 +6,26 @@ const { runRendererAction } = require('./renderer-bridge');
 
 const PRELOAD_SCRIPT_PATH = path.join(__dirname, '..', 'preload.js');
 const FIRST_PAINT_FALLBACK_MS = 5000;
+
+/* gate shell.openExternal on http/https: a `javascript:` or custom-scheme URL
+   reaching openExternal would be handed to the OS, which may pass it to a
+   browser that interprets it. fb shouldn't emit such links, but our allowed-
+   host rejection path is the catch-all and must stay safe. */
+function safeOpenExternal(url) {
+  if (typeof url !== 'string') return;
+  if (!/^https?:\/\//i.test(url)) return;
+  shell.openExternal(url);
+}
 /* fb messenger leaks renderer memory over long sessions (large react tree,
    scroll-virtualised log backbuffer, retained media). reload every 30m
    while the window is unfocused so we never interrupt active typing. */
 const RENDERER_REFRESH_INTERVAL_MS = 30 * 60 * 1000;
 
+/* this is the main-process keyboard pipeline (Electron's
+   before-input-event). it duplicates inject/terminal.js handleKeyboardShortcut
+   on purpose: the main-process one fires even if the renderer's JS is
+   stalled or hasn't finished injecting. when adding/changing a shortcut,
+   update BOTH pipelines or one of the two firing paths will silently miss. */
 function shortcutHandlerFor(input) {
   const pressedKey = input.key?.toLowerCase();
   if (!pressedKey) return null;
@@ -77,14 +92,14 @@ function createMessengerWindow(appConfig, sessionPartition, storedSettings = {})
 
   messengerWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (isAllowedMessengerUrl(url, appConfig.allowedHosts)) return { action: 'allow' };
-    shell.openExternal(url);
+    safeOpenExternal(url);
     return { action: 'deny' };
   });
 
   messengerWindow.webContents.on('will-navigate', (event, url) => {
     if (isAllowedMessengerUrl(url, appConfig.allowedHosts)) return;
     event.preventDefault();
-    shell.openExternal(url);
+    safeOpenExternal(url);
   });
 
   messengerWindow.on('page-title-updated', (event, updatedTitle) => {

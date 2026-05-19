@@ -8,7 +8,12 @@ const settings = loadInitialSettings(userConfig);
 
 let keyboardShortcutsBound = false;
 let mutationObserverStarted = false;
+let gKeyPendingTimer = null;
 
+/* renderer-side keyboard pipeline. mirrors the main-process handler in
+   shell/messenger-window.js shortcutHandlerFor() - both fire so a stuck
+   renderer doesn't lock out the keybindings. when adding/changing a
+   shortcut, update BOTH or one of the two firing paths will miss. */
 function handleKeyboardShortcut(event) {
   const isPrimaryModifier = event.ctrlKey || event.metaKey;
   const pressedKey = event.key?.toLowerCase();
@@ -54,6 +59,57 @@ function handleKeyboardShortcut(event) {
   }
   if (event.key === '/' && !isUserTypingInto(event.target)) {
     openPalette(':');
+    event.preventDefault();
+    return;
+  }
+
+  /* vim-style navigation: j/k move through the chat list, gg jumps to
+     log top, G jumps to log bottom. only fire when the user is not
+     typing into a field, so plain text entry stays unaffected. */
+  if (isUserTypingInto(event.target)) return;
+  if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+  if (pressedKey === 'j' && !event.shiftKey) {
+    moveChatListCursor(1);
+    event.preventDefault();
+    return;
+  }
+  if (pressedKey === 'k' && !event.shiftKey) {
+    moveChatListCursor(-1);
+    event.preventDefault();
+    return;
+  }
+  if (event.key === 'Enter' && chatListCursorRow) {
+    openChatListCursorTarget();
+    event.preventDefault();
+    return;
+  }
+  if (pressedKey === 'n') {
+    /* vim-style step through the last search's in-thread matches.
+       N (shift+n) walks backward; n walks forward. requires a prior
+       :search or ⌘⇧S query - silently no-ops otherwise so the key
+       doesn't surface noise on every press. */
+    const stepped = stepLastMessageMatch(event.shiftKey ? -1 : 1);
+    if (stepped) {
+      event.preventDefault();
+      return;
+    }
+  }
+  if (pressedKey === 'g' && event.shiftKey) {
+    /* shift+G - jump to bottom of the log */
+    scrollLogToBottom();
+    event.preventDefault();
+    return;
+  }
+  if (pressedKey === 'g' && !event.shiftKey) {
+    /* double-tap g (gg) - jump to top of the log. matches vim. */
+    if (gKeyPendingTimer) {
+      clearTimeout(gKeyPendingTimer);
+      gKeyPendingTimer = null;
+      scrollLogToTop();
+    } else {
+      gKeyPendingTimer = setTimeout(() => { gKeyPendingTimer = null; }, 500);
+    }
     event.preventDefault();
   }
 }
@@ -256,6 +312,72 @@ function start() {
   bindManualSelectionDriver();
   startMutationObserver();
   startStatuslineClock();
+  bindWindowFocusIndicator();
+  bindJumpToBottomIndicator();
+  bindConnectionStatus();
+}
+
+/* show a small "↓ latest" button while the user is scrolled up in the
+   log. fb's chat log is replaced on thread switch so we can't capture
+   the element once and bind to it - listen at the document level (with
+   capture phase) and re-evaluate alongside our existing mutation-driven
+   apply pass instead of polling on a wall-clock interval. that path
+   already fires when fb appends a new message at the bottom while we're
+   scrolled up; piggy-backing avoids a forever-running setInterval that
+   forces a layout flush ten times a minute on idle.
+
+   also tracks the composer height so the indicator sits just above the
+   composer in ultra mode (where the composer is position:fixed and can
+   grow with multi-line typing) without overlapping. */
+function bindJumpToBottomIndicator() {
+  function getOrCreateIndicator() {
+    const existing = document.getElementById('tm-jump-bottom');
+    if (existing) return existing;
+    const indicator = document.createElement('button');
+    indicator.id = 'tm-jump-bottom';
+    indicator.type = 'button';
+    indicator.setAttribute('aria-label', 'jump to latest message');
+    indicator.textContent = '↓ latest';
+    indicator.addEventListener('click', () => scrollLogToBottom());
+    document.documentElement.appendChild(indicator);
+    return indicator;
+  }
+
+  function evaluate() {
+    const log = document.querySelector('[role="log"], [data-tm-thread]');
+    if (!log) return;
+    const remaining = log.scrollHeight - log.scrollTop - log.clientHeight;
+    const ind = getOrCreateIndicator();
+    if (remaining > 200) {
+      ind.classList.add('tm-jump-bottom-visible');
+    } else {
+      ind.classList.remove('tm-jump-bottom-visible');
+    }
+    /* feed composer height into a CSS var so the indicator can anchor
+       above the ultra composer regardless of typing-induced growth. */
+    const composer = document.querySelector('[data-tm-ultra-composer]');
+    if (composer) {
+      const composerHeight = composer.getBoundingClientRect().height;
+      if (Number.isFinite(composerHeight) && composerHeight > 0) {
+        document.documentElement.style.setProperty('--tm-composer-height', `${Math.round(composerHeight)}px`);
+      }
+    }
+  }
+
+  document.addEventListener('scroll', evaluate, true);
+  /* hook into the mutation-driven apply pass so we re-evaluate when new
+     messages arrive while we're scrolled at the bottom. */
+  jumpBottomEvaluators.push(evaluate);
+}
+
+/* shared evaluators invoked from applyDocumentTheme. defined here so the
+   ordering matches the bundler concat order (terminal.js is last and
+   theme-application.js calls into it via this list). */
+const jumpBottomEvaluators = [];
+function runJumpBottomEvaluators() {
+  for (const fn of jumpBottomEvaluators) {
+    try { fn(); } catch {}
+  }
 }
 
 window.TerminalMessenger = {
@@ -265,6 +387,8 @@ window.TerminalMessenger = {
   closePalette,
   openSearchOverlay,
   closeSearchOverlay,
+  openNotificationsOverlay,
+  closeNotificationsOverlay,
   toggleTheme,
   setTheme,
   setUltra,
@@ -274,6 +398,19 @@ window.TerminalMessenger = {
   setOpacityPct,
   setMuted,
   toggleMuted,
+  setDensity,
+  setFontSizePx,
+  bumpFontSizePx,
+  setSentColor,
+  toggleSentColor,
+  scrollLogToBottom,
+  scrollLogToTop,
+  setChatListFilter,
+  pinCursoredChat,
+  markCursoredChatUnread,
+  muteCursoredChat,
+  moveChatListCursor,
+  openChatListCursorTarget,
   focusConversationInput,
   focusSearch: focusSearchInput,
   searchMessenger,

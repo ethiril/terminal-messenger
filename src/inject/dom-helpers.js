@@ -35,7 +35,10 @@ function isInsideReactionContainer(element) {
 const pasteUnblockedElements = new WeakSet();
 
 function unblockPasteOnInputs() {
-  document.querySelectorAll('input, textarea').forEach((element) => {
+  /* include contenteditable: the message composer is a contenteditable,
+     and fb sometimes attaches paste blockers there too. without this,
+     pasting into the very field where you most want to paste is blocked. */
+  document.querySelectorAll('input, textarea, [contenteditable="true"], [role="textbox"]').forEach((element) => {
     if (pasteUnblockedElements.has(element)) return;
     pasteUnblockedElements.add(element);
 
