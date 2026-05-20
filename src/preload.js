@@ -44,6 +44,39 @@ function readStoredSettingsFromArgs() {
 
 const storedSettings = readStoredSettingsFromArgs();
 
+/* fb installs paste/copy/cut blockers on the composer (and React-bound
+   handlers on its event root) that call preventDefault, killing the
+   browser's default clipboard behavior. our inject script runs at
+   dom-ready, by which point fb's listeners are already registered and
+   fire first in capture phase — so an element-level stopImmediatePropagation
+   added later is too late. preload runs before any page script, so
+   listeners registered here on window land first in registration order
+   and fire before fb's. we also overwrite the event's preventDefault on
+   the instance: even if a later listener calls preventDefault (or fb
+   stashed a reference to Event.prototype.preventDefault and bypasses our
+   propagation stop), it becomes a no-op on this specific event. */
+function installClipboardUnblocker() {
+  function isEditableTarget(target) {
+    if (!target) return false;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return true;
+    if (target.isContentEditable === true) return true;
+    if (typeof target.closest !== 'function') return false;
+    return Boolean(target.closest('input, textarea, [contenteditable="true"], [role="textbox"]'));
+  }
+
+  function neutralizeClipboardEvent(event) {
+    if (!isEditableTarget(event.target)) return;
+    event.preventDefault = () => {};
+    event.stopImmediatePropagation();
+  }
+
+  for (const eventType of ['paste', 'copy', 'cut']) {
+    window.addEventListener(eventType, neutralizeClipboardEvent, true);
+  }
+}
+
+installClipboardUnblocker();
+
 function readSavedTheme() {
   if (VALID_THEMES.includes(storedSettings.theme)) return storedSettings.theme;
   try {
