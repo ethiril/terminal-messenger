@@ -2375,8 +2375,17 @@ body.tm-terminal-theme [data-tm-composer-placeholder] {
 
    the :has() flip on the parent is what re-orders the layout in
    non-ultra mode. Electron/Chromium has supported :has() since 105
-   (2022) - safe to use. */
-body.tm-terminal-theme *:has(> [data-tm-composer-reply-preview]) {
+   (2022) - safe to use.
+
+   scoped to :not(.tm-ultra) on purpose: in ultra mode the preview is
+   position:fixed (anchored via JS to the textbox top - see
+   updateReplyPreviewBottom in chrome-tagging.js), so the parent's flow
+   layout doesn't need to change. forcing the parent to flex-column in
+   ultra was destabilising fb's composer wrapper enough that on the
+   first keystroke [data-tm-ultra-composer]'s measured height ballooned
+   from 45px to ~1100px, dragging the preview (anchored to that var)
+   far off-screen. */
+body.tm-terminal-theme:not(.tm-ultra) *:has(> [data-tm-composer-reply-preview]) {
   display: flex !important;
   flex-direction: column !important;
   align-items: stretch !important;
@@ -2463,10 +2472,17 @@ body.tm-terminal-theme [data-tm-composer-reply-preview] i[data-visualcompletion=
 /* in ultra mode the textbox region is position:fixed; bottom:0 and the
    preview's parent (a normal-flow div higher up) can't reach the bottom
    strip. promote the preview itself to fixed so it sits just above the
-   composer, full-width, z-indexed above the composer's chrome. */
+   composer, full-width, z-indexed above the composer's chrome.
+
+   bottom is fed from --tm-reply-preview-bottom (set in chrome-tagging.js
+   from the textbox input's actual top) rather than --tm-composer-height:
+   that wrapper-derived value jumped to ~1100px when fb remounted the
+   composer subtree on the first keystroke, sending the preview off the
+   top of the viewport. anchoring directly off the textbox input is
+   stable across fb's re-renders. */
 body.tm-ultra [data-tm-composer-reply-preview] {
   position: fixed !important;
-  bottom: var(--tm-composer-height, 45px) !important;
+  bottom: var(--tm-reply-preview-bottom, 56px) !important;
   left: 0 !important;
   right: 0 !important;
   width: auto !important;
