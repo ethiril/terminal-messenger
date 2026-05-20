@@ -1,5 +1,31 @@
-const { Menu } = require('electron');
+const { Menu, clipboard } = require('electron');
 const { runRendererAction } = require('./renderer-bridge');
+
+/* the messenger composer is a Lexical contenteditable. fb installs paste
+   blockers on the paste event, and Lexical itself only updates its editor
+   model from inside its own paste listener — so stopping fb's blocker
+   (preload.js installClipboardUnblocker) also stops Lexical, and the
+   browser-default text we insert gets wiped on the next reconcile. avoid
+   the paste event entirely: feed text through Chromium's editor command
+   pipeline via webContents.insertText, which fires beforeinput/input
+   (which Lexical does honor) instead of paste. fall back to the native
+   paste for image clipboards so screenshots still work. */
+function pasteIntoFocusedWindow(focusedWindow) {
+  if (!focusedWindow || focusedWindow.isDestroyed()) return;
+  const hasImageOnClipboard = clipboard.availableFormats().some(
+    (format) => format.startsWith('image/')
+  );
+  if (hasImageOnClipboard) {
+    focusedWindow.webContents.paste();
+    return;
+  }
+  const clipboardText = clipboard.readText();
+  if (!clipboardText) {
+    focusedWindow.webContents.paste();
+    return;
+  }
+  focusedWindow.webContents.insertText(clipboardText);
+}
 
 function buildApplicationMenu(appConfig) {
   const menuTemplate = [
@@ -19,8 +45,16 @@ function buildApplicationMenu(appConfig) {
         { type: 'separator' },
         { role: 'cut' },
         { role: 'copy' },
-        { role: 'paste' },
-        { role: 'pasteAndMatchStyle' },
+        {
+          label: 'Paste',
+          accelerator: 'CmdOrCtrl+V',
+          click: (_menuItem, focusedWindow) => pasteIntoFocusedWindow(focusedWindow)
+        },
+        {
+          label: 'Paste and Match Style',
+          accelerator: 'CmdOrCtrl+Shift+V',
+          click: (_menuItem, focusedWindow) => pasteIntoFocusedWindow(focusedWindow)
+        },
         { role: 'delete' },
         { role: 'selectAll' }
       ]

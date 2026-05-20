@@ -208,6 +208,23 @@ function tagImageCollapseToggles() {
     }
   }
 
+  /* drop wrappers nested inside other wrappers in the same pass - fb sometimes
+     renders an image with multiple <img> elements at different DOM depths (e.g.
+     a blurhash placeholder + the real photo), and findImageWrapper can land
+     them on different slot-keepers where one ancestors the other. without this
+     each one gets its own toggle, producing the duplicate "[-] image" visible
+     to the user. keep only the outermost wrapper per logical image. */
+  const wrappers = [...wrapperGroups.keys()];
+  for (const wrapper of wrappers) {
+    for (const other of wrappers) {
+      if (other === wrapper) continue;
+      if (other.contains(wrapper)) {
+        wrapperGroups.delete(wrapper);
+        break;
+      }
+    }
+  }
+
   for (const [wrapper, group] of wrapperGroups) {
     const firstImg = group.imgs[0];
     const existingToggle = imageCollapseTogglesByImg.get(firstImg);
@@ -219,8 +236,22 @@ function tagImageCollapseToggles() {
     const isCollapsed = wrapper.getAttribute('data-tm-img-wrapper-collapsed') === 'true'
       || firstImg.getAttribute('data-tm-img-collapsed') === 'true';
     const mediaKind = group.isVideoPoster ? 'video' : 'image';
-    const toggle = buildImageCollapseToggle(isCollapsed, mediaKind);
-    wrapperParent.insertBefore(toggle, wrapper);
+
+    /* reuse an adjacent orphan toggle instead of stacking a new one. when fb
+       swaps the <img> during a subtree re-render, our per-img WeakMap misses
+       the fresh element and the previously inserted toggle survives as the
+       wrapper's previous sibling - inserting again would produce two toggles
+       for the same image. rebinding keeps the count at one. */
+    const adjacent = wrapper.previousElementSibling;
+    let toggle;
+    if (adjacent && adjacent.matches('[data-tm-img-collapse-toggle]')) {
+      toggle = adjacent;
+      toggle.setAttribute('data-tm-img-collapse-kind', mediaKind);
+      applyImageCollapseToggleState(toggle, isCollapsed);
+    } else {
+      toggle = buildImageCollapseToggle(isCollapsed, mediaKind);
+      wrapperParent.insertBefore(toggle, wrapper);
+    }
     wrappersByToggle.set(toggle, wrapper);
     for (const img of group.imgs) imageCollapseTogglesByImg.set(img, toggle);
   }

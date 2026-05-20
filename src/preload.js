@@ -44,6 +44,45 @@ function readStoredSettingsFromArgs() {
 
 const storedSettings = readStoredSettingsFromArgs();
 
+/* fb installs paste/copy/cut blockers on the composer that call
+   preventDefault, killing the browser's default clipboard behavior.
+   preload runs before any page script, so a window-capture listener
+   registered here fires before fb's, and overwriting preventDefault on
+   the event instance neuters fb's blocker even when it runs later — a
+   later preventDefault() call lands on our no-op.
+
+   we do NOT stop propagation here: Lexical (the composer's editor) has
+   its own paste listener that reads clipboardData and updates the
+   editor model, and fb has a separate image-paste handler that uploads
+   pasted screenshots. an earlier version called stopImmediatePropagation
+   to silence the blocker, but it also silenced those legitimate
+   handlers — text pasted into the composer got wiped on Lexical's next
+   reconcile, and image paste did nothing. text paste is now routed via
+   shell/application-menu.js pasteIntoFocusedWindow → webContents.insertText
+   (which fires beforeinput, not paste, sidestepping all of this);
+   image paste falls back to webContents.paste, which needs fb's image
+   handler to actually fire. */
+function installClipboardUnblocker() {
+  function isEditableTarget(target) {
+    if (!target) return false;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return true;
+    if (target.isContentEditable === true) return true;
+    if (typeof target.closest !== 'function') return false;
+    return Boolean(target.closest('input, textarea, [contenteditable="true"], [role="textbox"]'));
+  }
+
+  function neutralizeClipboardEvent(event) {
+    if (!isEditableTarget(event.target)) return;
+    event.preventDefault = () => {};
+  }
+
+  for (const eventType of ['paste', 'copy', 'cut']) {
+    window.addEventListener(eventType, neutralizeClipboardEvent, true);
+  }
+}
+
+installClipboardUnblocker();
+
 function readSavedTheme() {
   if (VALID_THEMES.includes(storedSettings.theme)) return storedSettings.theme;
   try {

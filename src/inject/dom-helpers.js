@@ -30,14 +30,14 @@ function isInsideReactionContainer(element) {
   return false;
 }
 
-/* fb attaches paste/copy/cut blockers to the composer; users want their own
-   clipboard back. WeakSet keeps re-runs across mutations cheap. */
+/* belt-and-braces companion to preload.js installClipboardUnblocker:
+   strips any inline on{paste,copy,cut} handlers fb might attach to a
+   freshly-rendered composer/input. the preload listener handles the
+   addEventListener-style blockers; this handles the inline-attribute
+   path, which propagation control can't reach. */
 const pasteUnblockedElements = new WeakSet();
 
 function unblockPasteOnInputs() {
-  /* include contenteditable: the message composer is a contenteditable,
-     and fb sometimes attaches paste blockers there too. without this,
-     pasting into the very field where you most want to paste is blocked. */
   document.querySelectorAll('input, textarea, [contenteditable="true"], [role="textbox"]').forEach((element) => {
     if (pasteUnblockedElements.has(element)) return;
     pasteUnblockedElements.add(element);
@@ -48,6 +48,5 @@ function unblockPasteOnInputs() {
     element.removeAttribute('onpaste');
     element.removeAttribute('oncopy');
     element.removeAttribute('oncut');
-    element.addEventListener('paste', (event) => event.stopImmediatePropagation(), true);
   });
 }
