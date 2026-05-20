@@ -186,6 +186,72 @@ function tagComposerPlaceholder() {
   }
 }
 
+/* when the user clicks Reply on a message, fb renders a "Replying to <name>"
+   preview as a sibling of the composer's textbox region - not a descendant
+   - so a scope walk down from the textbox wrapper misses it entirely. fb's
+   parent for the preview+textbox pair is flex-row, which places the preview
+   to the LEFT of the textbox at the same y; in ultra mode the position:
+   fixed composer then covers it. find the preview anywhere inside
+   [role='main'] (outside the log/thread so existing in-message replies
+   aren't matched), then climb to the largest wrapper that does NOT
+   contain the composer input - that's the preview's branch. CSS rules
+   keyed off the tag re-flow the preview ABOVE the textbox in both modes. */
+function tagComposerReplyPreview() {
+  const composerInput = findFirstMatchingElement(COMPOSER_INPUT_SELECTORS);
+  if (!composerInput) {
+    document.querySelectorAll('[data-tm-composer-reply-preview]')
+      .forEach((node) => node.removeAttribute('data-tm-composer-reply-preview'));
+    return;
+  }
+
+  const mainElement = composerInput.closest('[role="main"]') ?? document.body;
+
+  /* fast path: the Cancel reply button is a stable anchor (aria-label
+     "Cancel reply"). prefer it over text-matching when present - localised
+     fb builds may translate "Replying to" but the aria-label tends to
+     stay english in this build. */
+  let anchor = mainElement.querySelector('[aria-label="Cancel reply" i]');
+
+  if (!anchor) {
+    /* fallback: text scan for the "Replying to <name>" header. skip
+       nodes that engulf or are inside the composer input, and skip
+       anything inside the message log (those are already-sent reply
+       quotes, a different feature handled by tagReplyQuotes). */
+    for (const candidate of mainElement.querySelectorAll('div, span, section, aside, h3, h4, p')) {
+      if (candidate === composerInput) continue;
+      if (candidate.contains(composerInput)) continue;
+      if (composerInput.contains(candidate)) continue;
+      if (candidate.closest('[role="log"], [data-tm-thread]')) continue;
+      const directText = collectDirectText(candidate);
+      if (!directText) continue;
+      if (directText.length > 80) continue;
+      if (!/\breplying to\b/i.test(directText)) continue;
+      anchor = candidate;
+      break;
+    }
+  }
+
+  if (!anchor) {
+    /* user cancelled or never started a reply - clear any stale tag */
+    document.querySelectorAll('[data-tm-composer-reply-preview]')
+      .forEach((node) => node.removeAttribute('data-tm-composer-reply-preview'));
+    return;
+  }
+
+  /* climb until the next step up would engulf the input. the resulting
+     wrapper is the preview's whole branch (cancel button + sender label +
+     quoted body), which is a sibling of the textbox region's branch. */
+  let wrapper = anchor;
+  while (wrapper.parentElement && !wrapper.parentElement.contains(composerInput)) {
+    wrapper = wrapper.parentElement;
+  }
+
+  if (wrapper.hasAttribute('data-tm-composer-reply-preview')) return;
+  document.querySelectorAll('[data-tm-composer-reply-preview]')
+    .forEach((node) => node.removeAttribute('data-tm-composer-reply-preview'));
+  wrapper.setAttribute('data-tm-composer-reply-preview', 'true');
+}
+
 /* mark chat-list rows that look unread so the :filter command can hide
    everything else. fb encodes unread in several places:
    - aria-label includes "unread"

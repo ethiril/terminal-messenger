@@ -254,7 +254,16 @@ function closeMediaViewer() {
    user saw an empty viewer window. instead leave fb's video element where
    it is and just (a) expose native browser controls, (b) let it scale up
    to a sensible max size. clicks pass through to fb's normal play/pause
-   toggle. inline-watching is the path of least surprise here. */
+   toggle. inline-watching is the path of least surprise here.
+
+   GIFs and stickers are a separate case: fb renders them as <video loop>
+   (no audio track) and vanilla messenger auto-plays them inline. our
+   universal controls/preload tweak below was wiping the autoplay-friendly
+   defaults - GIFs ended up paused on their poster frame with a controls
+   bar overlay. detect the GIF/sticker pattern via the loop attribute fb
+   sets (regular videos don't carry it) and force autoplay+muted+playsinline
+   so chromium's autoplay policy lets them through. no controls on a GIF -
+   it's meant to read as a moving image, not a video. */
 function ensureLogVideoControls() {
   const videos = document.querySelectorAll(
     '[role="log"] video:not([data-tm-video-controls]),'
@@ -262,10 +271,30 @@ function ensureLogVideoControls() {
   );
   for (const video of videos) {
     video.setAttribute('data-tm-video-controls', 'true');
-    video.controls = true;
-    video.setAttribute('controlslist', 'nodownload');
     video.setAttribute('playsinline', '');
-    video.setAttribute('preload', 'metadata');
+
+    const isGifLike = video.hasAttribute('loop') || video.loop;
+    if (isGifLike) {
+      video.muted = true;
+      video.loop = true;
+      video.autoplay = true;
+      video.controls = false;
+      video.removeAttribute('controls');
+      video.setAttribute('preload', 'auto');
+      /* chromium pauses fb's <video> on initial mount when its autoplay
+         policy can't yet confirm the document has user interaction.
+         force a play() call now - returns a promise that rejects silently
+         if blocked, which is fine: a user click anywhere on the page
+         later will unlock playback and fb's own observer kicks it in. */
+      const playResult = video.play();
+      if (playResult && typeof playResult.then === 'function') {
+        playResult.catch(() => {});
+      }
+    } else {
+      video.controls = true;
+      video.setAttribute('controlslist', 'nodownload');
+      video.setAttribute('preload', 'metadata');
+    }
   }
 }
 

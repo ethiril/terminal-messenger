@@ -12,6 +12,23 @@ const { runRendererAction } = require('./renderer-bridge');
    paste for image clipboards so screenshots still work. */
 function pasteIntoFocusedWindow(focusedWindow) {
   if (!focusedWindow || focusedWindow.isDestroyed()) return;
+
+  /* DevTools (docked or undocked) lives in its own webContents. our custom
+     menu accelerator intercepts Cmd+V regardless of which webContents has
+     focus, so without this guard the user can't paste into the DevTools
+     console — webContents.insertText targets the page's focused editable,
+     not DevTools, so the paste silently no-ops (or worse, dumps clipboard
+     text into the messenger composer when it's the focused editable).
+     route through the DevTools webContents' native paste when DevTools is
+     focused so the console / sources panel / editors all work normally. */
+  if (focusedWindow.webContents.isDevToolsFocused()) {
+    const devToolsContents = focusedWindow.webContents.devToolsWebContents;
+    if (devToolsContents && !devToolsContents.isDestroyed()) {
+      devToolsContents.paste();
+    }
+    return;
+  }
+
   const hasImageOnClipboard = clipboard.availableFormats().some(
     (format) => format.startsWith('image/')
   );
