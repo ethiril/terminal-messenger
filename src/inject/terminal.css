@@ -1146,11 +1146,39 @@ body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] {
    as washed-out rather than as a recognisable thumbnail. css opacity on a
    parent caps child opacity (it's multiplicative), so we have to clear it
    on the wrapper rather than override per-descendant. the border-indent +
-   muted color on any accompanying text still mark it as a quote. */
+   muted color on any accompanying text still mark it as a quote.
+
+   override display:inline-block (set on text quotes for shrink-to-fit
+   sizing) with block here so the user's reply text wraps to a new line
+   under the image instead of rendering inline against the image's bottom
+   edge - previously the reply text ("ahahaha...") visibly overlapped the
+   bottom strip of the image because inline-block kept the text on the
+   same line box as the image. block + margin-bottom gives clean
+   separation; the leading border-indent is dropped on media (no need to
+   mark an image as "quoted text") so the image displays at full width. */
 body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote]:has(img),
 body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote]:has(video),
 body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote]:has(picture) {
   opacity: 1 !important;
+  display: block !important;
+  border-inline-start: none !important;
+  padding-left: 0 !important;
+  margin-bottom: 6px !important;
+  width: fit-content !important;
+}
+
+/* outgoing image replies are right-aligned in the bubble; without the
+   margin-left:auto the block falls back to the bubble's leading edge
+   (left) while the reply text below stays right-aligned, leaving a
+   stranded image. align with the response. */
+body.tm-terminal-theme [aria-roledescription='message'][data-tm-direction='out'] [data-tm-reply-quote]:has(img),
+body.tm-terminal-theme [aria-roledescription='message'][data-tm-direction='out'] [data-tm-reply-quote]:has(video),
+body.tm-terminal-theme [aria-roledescription='message'][data-tm-direction='out'] [data-tm-reply-quote]:has(picture),
+body.tm-terminal-theme [role='row'][data-tm-direction='out'] [data-tm-reply-quote]:has(img),
+body.tm-terminal-theme [role='row'][data-tm-direction='out'] [data-tm-reply-quote]:has(video),
+body.tm-terminal-theme [role='row'][data-tm-direction='out'] [data-tm-reply-quote]:has(picture) {
+  margin-left: auto !important;
+  margin-right: 0 !important;
 }
 
 body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote],
@@ -2069,14 +2097,23 @@ body.tm-terminal-theme [data-tm-thread] [data-tm-link-preview] {
   text-align: left !important;
 }
 
-/* link preview thumbnails are noise in a terminal aesthetic. drop the
-   image; the title + host already identify the link, and the user can
-   click through if they want the visual. */
+/* link preview thumbnails (e.g. youtube video posters) - show them
+   capped at a thumbnail-friendly size so the card reads as "preview"
+   not "image dump". the per-image collapse toggle stays in flow so
+   the user can still hide a thumbnail per-card if a particular link
+   is noisy. */
 body.tm-terminal-theme [role='log'] [data-tm-link-preview] img,
 body.tm-terminal-theme [role='log'] [data-tm-link-preview] picture,
 body.tm-terminal-theme [data-tm-thread] [data-tm-link-preview] img,
 body.tm-terminal-theme [data-tm-thread] [data-tm-link-preview] picture {
-  display: none !important;
+  display: block !important;
+  max-width: 100% !important;
+  max-height: 180px !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: cover !important;
+  margin: 2px 0 4px !important;
+  border: 1px solid var(--tm-dim) !important;
 }
 
 /* prepend "[host] " before the title so the user can tell at a glance
@@ -2316,6 +2353,130 @@ body.tm-terminal-theme [data-tm-composer-host] [role='textbox'] {
    placeholder is positioned. JS-tagged by chrome-tagging.js. */
 body.tm-terminal-theme [data-tm-composer-placeholder] {
   transform: translateX(14px) !important;
+}
+
+/* ─── composer reply preview ─── */
+
+/* when the user clicks Reply on a message, fb renders a "Replying to <name>"
+   preview as a SIBLING of the textbox region (not a descendant), inside a
+   flex-row parent that places the preview to the LEFT of the textbox at
+   the same y. in ultra mode the position:fixed composer then covers it
+   entirely - the user types a reply with no visible indication of what
+   they're responding to. JS-tagged in chrome-tagging.js.
+
+   1. force the preview's parent to flex-column so the preview stacks
+      ABOVE the textbox instead of beside it.
+   2. style the preview as a terminal-style quote line (accent border +
+      dim italic) so it reads as quoted context.
+   3. in ultra mode the parent is in normal flow but the textbox sibling
+      is position:fixed at the bottom - the parent can't reach the bottom
+      strip on its own, so promote the preview to position:fixed too,
+      anchored just above the composer.
+
+   the :has() flip on the parent is what re-orders the layout in
+   non-ultra mode. Electron/Chromium has supported :has() since 105
+   (2022) - safe to use. */
+body.tm-terminal-theme *:has(> [data-tm-composer-reply-preview]) {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+}
+
+body.tm-terminal-theme [data-tm-composer-reply-preview] {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  height: auto !important;
+  width: auto !important;
+  overflow: visible !important;
+  margin: 4px 0 !important;
+  padding: 4px 8px !important;
+  background: var(--tm-bg) !important;
+  border-left: 2px solid var(--tm-accent) !important;
+  border-top: 1px dashed var(--tm-dim) !important;
+  border-bottom: 1px dashed var(--tm-dim) !important;
+  font-family: var(--tm-font-stack) !important;
+  font-size: var(--tm-font-size) !important;
+  color: var(--tm-muted) !important;
+  font-style: italic !important;
+  order: -1 !important;
+}
+
+body.tm-terminal-theme [data-tm-composer-reply-preview] *,
+body.tm-terminal-theme [data-tm-composer-reply-preview] span,
+body.tm-terminal-theme [data-tm-composer-reply-preview] div,
+body.tm-terminal-theme [data-tm-composer-reply-preview] a {
+  visibility: visible !important;
+  opacity: 1 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  color: var(--tm-muted) !important;
+  font-style: italic !important;
+  font-size: var(--tm-font-size) !important;
+  line-height: var(--tm-line-height) !important;
+  background: transparent !important;
+}
+
+/* keep the cancel button clickable + readable. fb uses aria-label
+   "Cancel reply"; render an explicit [x] glyph so the user has a clear
+   close affordance even if the underlying svg/icon was stripped by the
+   universal svg crush. */
+body.tm-terminal-theme [data-tm-composer-reply-preview] [role='button'][aria-label='Cancel reply' i],
+body.tm-terminal-theme [data-tm-composer-reply-preview] [role='button'][aria-label*='Cancel' i],
+body.tm-terminal-theme [data-tm-composer-reply-preview] button[aria-label*='Cancel' i] {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: var(--tm-font-size) !important;
+  line-height: 1 !important;
+  padding: 0 4px !important;
+  margin-left: 6px !important;
+  cursor: pointer !important;
+  color: var(--tm-muted) !important;
+  font-style: normal !important;
+  background: transparent !important;
+}
+
+body.tm-terminal-theme [data-tm-composer-reply-preview] [role='button'][aria-label*='Cancel' i]::before {
+  content: '[x]';
+  color: var(--tm-muted);
+  font-family: var(--tm-font-stack);
+}
+
+/* image/video thumbnails inside the preview (fb shows a small media tile
+   when you reply to a photo or video). the universal img hide masks them
+   sitewide; opt back in here so the preview shows what you're responding
+   to even when it's a media message. */
+body.tm-terminal-theme [data-tm-composer-reply-preview] img,
+body.tm-terminal-theme [data-tm-composer-reply-preview] picture,
+body.tm-terminal-theme [data-tm-composer-reply-preview] video,
+body.tm-terminal-theme [data-tm-composer-reply-preview] i[data-visualcompletion='css-img'] {
+  display: revert !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  max-width: 48px !important;
+  max-height: 48px !important;
+}
+
+/* in ultra mode the textbox region is position:fixed; bottom:0 and the
+   preview's parent (a normal-flow div higher up) can't reach the bottom
+   strip. promote the preview itself to fixed so it sits just above the
+   composer, full-width, z-indexed above the composer's chrome. */
+body.tm-ultra [data-tm-composer-reply-preview] {
+  position: fixed !important;
+  bottom: var(--tm-composer-height, 45px) !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: auto !important;
+  z-index: 110 !important;
+  margin: 0 !important;
+  padding: 6px 12px !important;
+  background: var(--tm-bg) !important;
+  border-top: 1px solid var(--tm-dim) !important;
+  border-bottom: 1px solid var(--tm-dim) !important;
+  border-left: 2px solid var(--tm-accent) !important;
 }
 
 /* ─── day separators in the log ─── */

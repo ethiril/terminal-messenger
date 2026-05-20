@@ -84,6 +84,7 @@ function applyDocumentTheme() {
   tagUltraLayoutTargets();
   tagComposerHost();
   tagComposerPlaceholder();
+  tagComposerReplyPreview();
   tagDaySeparators();
   tagMessageTimestamps();
   tagLinkPreviewHosts();
