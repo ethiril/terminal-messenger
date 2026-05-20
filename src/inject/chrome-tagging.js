@@ -246,10 +246,38 @@ function tagComposerReplyPreview() {
     wrapper = wrapper.parentElement;
   }
 
-  if (wrapper.hasAttribute('data-tm-composer-reply-preview')) return;
-  document.querySelectorAll('[data-tm-composer-reply-preview]')
-    .forEach((node) => node.removeAttribute('data-tm-composer-reply-preview'));
-  wrapper.setAttribute('data-tm-composer-reply-preview', 'true');
+  if (!wrapper.hasAttribute('data-tm-composer-reply-preview')) {
+    document.querySelectorAll('[data-tm-composer-reply-preview]')
+      .forEach((node) => node.removeAttribute('data-tm-composer-reply-preview'));
+    wrapper.setAttribute('data-tm-composer-reply-preview', 'true');
+  }
+
+  updateReplyPreviewBottom(composerInput);
+}
+
+/* in ultra mode the reply preview is position:fixed; bottom: var(...). we
+   used to feed bottom from --tm-composer-height (the [data-tm-ultra-composer]
+   wrapper's height) but that height jumps when fb remounts the composer
+   subtree on typing - we saw it balloon to ~1100px on the first keystroke,
+   sending the preview off the top of the viewport. anchor the preview to
+   the textbox input's actual top instead: the input's rendered position
+   doesn't depend on fb's wrapper layout, so it stays stable across the
+   reconciliation. set this even when no preview is active so the var
+   never lingers stale across reply <-> no-reply transitions. */
+function updateReplyPreviewBottom(composerInput) {
+  if (!composerInput) return;
+  if (!document.querySelector('[data-tm-composer-reply-preview]')) {
+    document.documentElement.style.removeProperty('--tm-reply-preview-bottom');
+    return;
+  }
+  const inputRect = composerInput.getBoundingClientRect();
+  if (!Number.isFinite(inputRect.top)) return;
+  if (inputRect.top <= 0 || inputRect.top > window.innerHeight) return;
+  const bottomFromViewport = window.innerHeight - inputRect.top + 4;
+  document.documentElement.style.setProperty(
+    '--tm-reply-preview-bottom',
+    `${Math.round(bottomFromViewport)}px`
+  );
 }
 
 /* mark chat-list rows that look unread so the :filter command can hide
