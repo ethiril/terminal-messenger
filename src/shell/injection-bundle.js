@@ -33,18 +33,48 @@ function buildInjectionScript(appConfig) {
   return `window.__TERMINAL_MESSENGER_CONFIG__ = ${userPreferences};\n(() => {\n${concatenatedModules}\n})();`;
 }
 
-async function injectTerminalLayer(targetWindow, appConfig) {
+/* insertCSS appends a fresh copy of the stylesheet on every call and
+   injectTerminalLayer fires on dom-ready, did-finish-load AND every
+   did-navigate-in-page - messenger is an SPA, so thread switches would
+   otherwise stack duplicate 2700-line stylesheets all session. mark the
+   document once the CSS is in; the marker naturally resets on real
+   navigations because the DOM is rebuilt. */
+const CSS_INJECTED_MARKER = 'data-tm-css-injected';
+
+/* serialise per-window so a dom-ready/did-finish-load pair racing on first
+   load can't both observe "no marker" and double-insert. */
+const injectionChains = new WeakMap();
+
+function injectTerminalLayer(targetWindow, appConfig) {
+  const previousRun = injectionChains.get(targetWindow) ?? Promise.resolve(false);
+  /* swallow a rejected predecessor so one unexpected failure (e.g. the
+     webContents dying mid-call) can't poison every later injection. */
+  const nextRun = previousRun
+    .catch(() => false)
+    .then(() => performInjection(targetWindow, appConfig));
+  injectionChains.set(targetWindow, nextRun);
+  return nextRun;
+}
+
+async function performInjection(targetWindow, appConfig) {
   if (targetWindow.isDestroyed()) return false;
   if (!isAllowedMessengerUrl(targetWindow.webContents.getURL(), appConfig.allowedHosts)) return false;
-
-  const terminalCss = readTextFileOrNull(TERMINAL_CSS_PATH);
-  if (terminalCss === null) return false;
 
   const injectionScript = buildInjectionScript(appConfig);
   if (injectionScript === null) return false;
 
   try {
-    await targetWindow.webContents.insertCSS(terminalCss, { cssOrigin: 'user' });
+    const cssAlreadyInjected = await targetWindow.webContents.executeJavaScript(
+      `document.documentElement.hasAttribute('${CSS_INJECTED_MARKER}')`, true
+    );
+    if (!cssAlreadyInjected) {
+      const terminalCss = readTextFileOrNull(TERMINAL_CSS_PATH);
+      if (terminalCss === null) return false;
+      await targetWindow.webContents.insertCSS(terminalCss, { cssOrigin: 'user' });
+      await targetWindow.webContents.executeJavaScript(
+        `document.documentElement.setAttribute('${CSS_INJECTED_MARKER}', 'true')`, true
+      );
+    }
     await targetWindow.webContents.executeJavaScript(injectionScript, true);
     return true;
   } catch (error) {

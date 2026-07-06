@@ -2,6 +2,12 @@ function applyDocumentTheme() {
   const documentRoot = document.documentElement;
   if (!documentRoot) return;
 
+  /* the preload's anti-flash style has done its job by the time we're
+     applying real classes. drop it: its unconditional `body { visibility:
+     hidden }` rule (revealed only by html.tm-ready) would otherwise blank
+     the entire page when vanilla mode strips .tm-ready below. */
+  document.getElementById('tm-early-style')?.remove();
+
   /* vanilla-mode escape hatch: when settings.themeDisabled is true, strip
      every terminal-mode class from <html>/<body> and bail before any of
      the JS-based tagging runs. all of the CSS selectors are scoped under

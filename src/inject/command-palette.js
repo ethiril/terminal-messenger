@@ -19,6 +19,8 @@ const COMMAND_REGISTRY = [
     complete: () => VALID_THEMES },
   { name: 'ultra',         aliases: [],             argSpec: '[on|off]',         help: 'ultra terminal mode (no arg = toggle)',
     complete: () => ['on', 'off'] },
+  { name: 'vanilla',       aliases: [],             argSpec: '[on|off]',         help: 'vanilla messenger mode - disable the terminal skin (no arg = toggle)',
+    complete: () => ['on', 'off'] },
   { name: 'opacity',       aliases: [],             argSpec: '<20-100>',         help: 'window transparency, percent' },
   { name: 'mute',          aliases: [],             argSpec: '[on|off]',         help: 'mute window audio (no arg = toggle)',
     complete: () => ['on', 'off'] },
@@ -38,11 +40,35 @@ const COMMAND_REGISTRY = [
   { name: 'mute-chat',     aliases: ['mc'],         argSpec: '',                 help: 'mute/unmute notifications for the cursored chat' },
   { name: 'notifications', aliases: ['log'],        argSpec: '',                 help: 'open the in-session toast log (alias :log)' },
   { name: 'reload',        aliases: [],             argSpec: '',                 help: 'reload the page' },
+  { name: 'dumpreply',     aliases: [],             argSpec: '',                 help: 'copy the last reply-message row\'s HTML to the clipboard (debug)' },
   { name: 'q',             aliases: ['exit', 'clear'], argSpec: '',              help: 'close this palette (alias :exit :clear)' }
 ];
 
 const ENABLE_FLAG_VALUES = ['on', 'true', '1'];
 const DISABLE_FLAG_VALUES = ['off', 'false', '0'];
+
+/* debug affordance for the image-reply layout work: grab the newest
+   reply-bearing message row and put its full outerHTML on the clipboard,
+   so the exact fb DOM can be shared without spelunking through devtools.
+   prefers a media-reply cluster (the case under active repair); falls
+   back to any reply row. */
+function runDumpReplyCommand() {
+  const clusters = document.querySelectorAll('[data-tm-media-reply]');
+  const replyRows = document.querySelectorAll(
+    '[role="log"] [data-tm-has-reply], [data-tm-thread] [data-tm-has-reply]'
+  );
+  const anchor = clusters[clusters.length - 1] ?? replyRows[replyRows.length - 1];
+  if (!anchor) return 'no reply message found in the loaded log';
+
+  const row = anchor.closest('[aria-roledescription="message"], [role="row"], [role="article"]') ?? anchor;
+  const html = row.outerHTML;
+  if (!navigator.clipboard?.writeText) return 'clipboard unavailable';
+  navigator.clipboard.writeText(html).then(
+    () => showToast('reply row HTML copied'),
+    () => showToast('clipboard blocked')
+  );
+  return `copied ${html.length} chars of reply-row HTML to clipboard`;
+}
 
 /* :goto / :c completion sources its candidates from the rendered chat
    list. fb's chat list is virtualised so only on-screen rows contribute -
@@ -85,6 +111,11 @@ function commandLookup(name) {
 const commandHistory = [];
 let historyCursor = -1;
 let suggestionCursor = 0;
+/* true once the user has actively arrowed through the suggestion list for
+   the current input. distinguishes "user picked this suggestion" (Enter
+   should run it) from the default index-0 highlight (Enter should run the
+   typed text). reset on every input edit and palette open. */
+let suggestionNavigated = false;
 
 function pushHistoryEntry(rawInput) {
   const trimmed = rawInput.trim();
@@ -137,7 +168,42 @@ function ensurePaletteElement() {
 
   inputElement.addEventListener('input', () => {
     suggestionCursor = 0;
+    suggestionNavigated = false;
     renderSuggestionsForInput(inputElement.value);
+  });
+
+  /* click-to-run on suggestion rows. mousedown (not click) so we can
+     preventDefault before the input loses focus. commands that still
+     need an argument are filled into the input instead of run, and the
+     arg suggestions render immediately. */
+  suggestionsElement.addEventListener('mousedown', (event) => {
+    const item = event.target instanceof Element
+      ? event.target.closest('.tm-command-suggestion')
+      : null;
+    if (!item) return;
+    event.preventDefault();
+
+    const index = Number(item.getAttribute('data-tm-suggestion-index'));
+    const candidates = candidatesForInput(inputElement.value).slice(0, PALETTE_SUGGESTION_LIMIT);
+    const chosen = candidates[index];
+    if (!chosen) return;
+
+    const completed = completeInputWithCandidate(inputElement.value, chosen);
+    if (chosen.kind === 'command' && chosen.entry.argSpec) {
+      inputElement.value = `${completed} `;
+      suggestionCursor = 0;
+      suggestionNavigated = false;
+      renderSuggestionsForInput(inputElement.value);
+      inputElement.focus();
+      return;
+    }
+
+    const submitted = completed.trim();
+    inputElement.value = submitted;
+    pushHistoryEntry(submitted);
+    renderCommandOutput(outputElement, runCommand(submitted));
+    suggestionsElement.replaceChildren();
+    inputElement.select();
   });
 
   inputElement.addEventListener('keydown', (event) => {
@@ -165,6 +231,7 @@ function ensurePaletteElement() {
       const list = suggestionsElement.querySelectorAll('.tm-command-suggestion');
       if (list.length > 1) {
         suggestionCursor = Math.max(0, suggestionCursor - 1);
+        suggestionNavigated = true;
         highlightSuggestion(suggestionsElement);
       } else {
         const recalled = recallHistory(-1);
@@ -179,6 +246,7 @@ function ensurePaletteElement() {
       const list = suggestionsElement.querySelectorAll('.tm-command-suggestion');
       if (list.length > 1) {
         suggestionCursor = Math.min(list.length - 1, suggestionCursor + 1);
+        suggestionNavigated = true;
         highlightSuggestion(suggestionsElement);
       } else {
         const recalled = recallHistory(1);
@@ -190,7 +258,8 @@ function ensurePaletteElement() {
     }
 
     if (event.key === 'Enter') {
-      const submitted = inputElement.value.trim();
+      const submitted = resolvePaletteSubmission(inputElement.value);
+      inputElement.value = submitted;
       pushHistoryEntry(submitted);
       const output = runCommand(submitted);
       renderCommandOutput(outputElement, output);
@@ -331,6 +400,42 @@ function applyTabCompletion(inputElement) {
   return true;
 }
 
+/* rebuild the input line with `candidate` substituted into the slot
+   currently being completed - same splice as applyTabCompletion's
+   single-candidate branch, factored out so Enter and click reuse it. */
+function completeInputWithCandidate(rawInput, candidate) {
+  if (candidate.kind === 'command') return `:${candidate.value}`;
+  const { tokens, trailingSpace } = parseInputTokens(rawInput);
+  /* a trailing space yields an empty last token - drop empties so the
+     rebuilt line doesn't carry a double space. */
+  const head = (trailingSpace ? tokens : tokens.slice(0, -1)).filter(Boolean);
+  return `:${head.join(' ')} ${candidate.value}`.replace(/^:\s+/, ':');
+}
+
+/* decide what Enter actually runs. two adoption paths:
+   - the user arrowed onto a suggestion: run that suggestion.
+   - the typed command name isn't a known command but the top suggestion
+     is: adopt it, so ":th⏎" runs ":theme" instead of erroring with
+     "unknown command: th". arg tokens are never auto-adopted - commands
+     like :goto do their own fuzzy matching on the typed text. */
+function resolvePaletteSubmission(rawInput) {
+  const trimmed = rawInput.trim();
+  const candidates = candidatesForInput(rawInput).slice(0, PALETTE_SUGGESTION_LIMIT);
+  if (candidates.length === 0) return trimmed;
+
+  const highlighted = candidates[Math.min(suggestionCursor, candidates.length - 1)];
+  if (suggestionNavigated) {
+    return completeInputWithCandidate(rawInput, highlighted).trim();
+  }
+
+  const { tokens } = parseInputTokens(rawInput);
+  const typedCommand = tokens[0] ?? '';
+  if (typedCommand && highlighted.kind === 'command' && !commandLookup(typedCommand)) {
+    return completeInputWithCandidate(rawInput, highlighted).trim();
+  }
+  return trimmed;
+}
+
 function longestCommonPrefix(strings) {
   if (strings.length === 0) return '';
   let prefix = strings[0];
@@ -354,10 +459,11 @@ function renderSuggestionsForInput(rawInput) {
   if (candidates.length === 0) return;
 
   const visible = candidates.slice(0, PALETTE_SUGGESTION_LIMIT);
-  for (const candidate of visible) {
+  for (const [index, candidate] of visible.entries()) {
     const item = document.createElement('li');
     item.className = 'tm-command-suggestion';
     item.setAttribute('role', 'option');
+    item.setAttribute('data-tm-suggestion-index', String(index));
     const nameNode = document.createElement('span');
     nameNode.className = 'tm-command-suggestion-name';
     nameNode.textContent = candidate.kind === 'command' ? `:${candidate.value}` : candidate.value;
@@ -393,6 +499,7 @@ function openPalette(seedValue = '') {
   inputElement.value = seedValue;
   historyCursor = commandHistory.length;
   suggestionCursor = 0;
+  suggestionNavigated = false;
   renderSuggestionsForInput(seedValue);
   /* clear stale output from a previous palette session - keeps the
      panel compact when the user just wants to fire a fresh command. */
@@ -469,6 +576,12 @@ function runCommand(rawInput) {
   switch (entry.name) {
     case 'theme':         return runThemeCommand(commandArgs);
     case 'ultra':         return runToggleableCommand(commandArgs, 'ultra', setUltra);
+    case 'vanilla': {
+      const flag = parseTriStateFlag(commandArgs[0]);
+      if (flag === null) return 'usage: :vanilla [on|off]';
+      setThemeDisabled(flag === 'toggle' ? !settings.themeDisabled : flag === 'on');
+      return `mode=${settings.themeDisabled ? 'vanilla' : 'terminal'}`;
+    }
     case 'opacity':       return runOpacityCommand(commandArgs);
     case 'mute':          return runToggleableCommand(commandArgs, 'muted', setMuted);
     case 'density':       return runDensityCommand(commandArgs);
@@ -500,6 +613,7 @@ function runCommand(rawInput) {
     case 'reload':
       window.location.reload();
       return 'reloading...';
+    case 'dumpreply':     return runDumpReplyCommand();
     case 'q':
       closePalette();
       return '';

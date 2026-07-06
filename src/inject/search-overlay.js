@@ -150,12 +150,36 @@ function applySearchActiveCursor(results) {
   });
 }
 
-function buildResultRow(result, index) {
+/* wrap every occurrence of the query in a span so the match is visible
+   inside long chat-list labels and message previews - without it the user
+   has to re-scan each row for why it matched. */
+function buildHighlightedLabelNodes(label, lowercaseQuery) {
+  if (!lowercaseQuery) return [document.createTextNode(label)];
+  const nodes = [];
+  const lowerLabel = label.toLowerCase();
+  let cursor = 0;
+  while (cursor < label.length) {
+    const hit = lowerLabel.indexOf(lowercaseQuery, cursor);
+    if (hit === -1) break;
+    if (hit > cursor) nodes.push(document.createTextNode(label.slice(cursor, hit)));
+    const mark = document.createElement('span');
+    mark.className = 'tm-search-match';
+    mark.textContent = label.slice(hit, hit + lowercaseQuery.length);
+    nodes.push(mark);
+    cursor = hit + lowercaseQuery.length;
+  }
+  if (cursor < label.length) nodes.push(document.createTextNode(label.slice(cursor)));
+  return nodes;
+}
+
+function buildResultRow(result, index, lowercaseQuery) {
   const resultItem = document.createElement('li');
   resultItem.className = 'tm-search-result';
   resultItem.setAttribute('data-tm-result-index', String(index));
   resultItem.setAttribute('data-tm-result-kind', result.kind);
-  resultItem.textContent = result.label.slice(0, SEARCH_LABEL_TRIM);
+  resultItem.replaceChildren(
+    ...buildHighlightedLabelNodes(result.label.slice(0, SEARCH_LABEL_TRIM), lowercaseQuery)
+  );
   resultItem.addEventListener('click', () => {
     if (result.kind === 'message') {
       result.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -234,14 +258,14 @@ function refreshSearchResults(queryText) {
   if (chatMatches.length > 0) {
     appendSearchSectionHeading(resultsElement, 'chats');
     for (const result of chatMatches) {
-      resultsElement.appendChild(buildResultRow(result, runningIndex));
+      resultsElement.appendChild(buildResultRow(result, runningIndex, lowercaseQuery));
       runningIndex += 1;
     }
   }
   if (messageMatches.length > 0) {
     appendSearchSectionHeading(resultsElement, 'messages in this chat');
     for (const result of messageMatches) {
-      resultsElement.appendChild(buildResultRow(result, runningIndex));
+      resultsElement.appendChild(buildResultRow(result, runningIndex, lowercaseQuery));
       runningIndex += 1;
     }
   }

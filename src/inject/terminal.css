@@ -829,6 +829,7 @@ body.tm-terminal-theme [role='tab'][aria-selected='true'] {
 /* fb wraps photo/link bubbles in role=button; without this override the
    global :hover would paint a tm-dim block around them */
 body.tm-terminal-theme [role='log'] [aria-selected='true'],
+body.tm-terminal-theme [data-tm-thread] [aria-selected='true'],
 body.tm-terminal-theme [role='log']:hover,
 body.tm-terminal-theme [role='log'] [role='row']:hover,
 body.tm-terminal-theme [role='log'] [role='gridcell']:hover,
@@ -1165,6 +1166,27 @@ body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote]:has(picture) {
   padding-left: 0 !important;
   margin-bottom: 6px !important;
   width: fit-content !important;
+}
+
+/* ─── image/video reply cluster ─── */
+
+/* the cluster's structural layout (flex-column stack of hint → preview →
+   reply text, direction-aware alignment) is applied as inline styles by
+   message-tagging.js restructureMediaReply - stylesheet selectors proved
+   too blunt for fb's varying nesting (the cluster parent can itself be
+   the direction-tagged element, which a descendant selector never
+   matches). CSS only owns the response bubble's visual skin below. */
+
+/* terminal-style bubble behind the reply text: mostly-opaque backing +
+   dim frame so the reply stays legible even if some fb layout we haven't
+   seen still lands it on the image. */
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-response] {
+  background-color: color-mix(in srgb, var(--tm-bg) 85%, transparent) !important;
+  border: 1px solid var(--tm-dim) !important;
+  padding: 2px 8px !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  border-radius: 0 !important;
 }
 
 /* outgoing image replies are right-aligned in the bubble; without the
@@ -1539,6 +1561,12 @@ html[data-tm-blurred] #tm-statusline .tm-prompt-arrow {
   color: var(--tm-text) !important;
   border-left: 2px solid transparent;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+#tm-command-root .tm-command-suggestion:hover {
+  background: var(--tm-dim) !important;
+  border-left-color: var(--tm-accent);
 }
 
 #tm-command-root .tm-command-suggestion-name {
@@ -1748,6 +1776,14 @@ html[data-tm-blurred] #tm-statusline .tm-prompt-arrow {
   cursor: default;
 }
 
+/* the substring that made the row match - accent + bold so the eye can
+   find it inside long labels/messages. overlays live outside <body>, so
+   the global font-weight reset never reaches this span. */
+#tm-search-root .tm-search-match {
+  color: var(--tm-accent) !important;
+  font-weight: 700 !important;
+}
+
 #tm-search-root .tm-search-footer {
   display: flex;
   gap: 12px;
@@ -1899,15 +1935,17 @@ body.tm-terminal-theme [data-tm-search-flash='true'] [aria-roledescription='mess
 }
 
 /* slot fb's live <video> gets reparented into. when empty it collapses;
-   when a video is mounted it expands and centers it like the image. */
+   when a video is mounted it fills the viewer body and centers the video.
+   the slot must have a DEFINITE size (100%/100%), not auto: the video's
+   max-width/max-height are percentages, and a percentage max-height
+   against an auto-height parent computes to none - portrait videos then
+   rendered at natural size and overflowed the frame. */
 #tm-media-viewer-root .tm-media-viewer-video-slot {
   display: flex;
   align-items: center;
   justify-content: center;
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
+  width: 100%;
+  height: 100%;
 }
 
 #tm-media-viewer-root .tm-media-viewer-video-slot[data-tm-media-empty="true"] {

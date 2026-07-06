@@ -95,22 +95,32 @@ Expect `kMDItemKind = "Application"`.
 
 (Substitute `Ctrl` for `Cmd` on non-macOS.)
 
-All settings — theme, ultra, vanilla, opacity, mute — persist across reloads via `localStorage`.
+All settings — theme, ultra, vanilla, opacity, mute, density, font size — persist across reloads via a JSON file in the app's user-data directory (mirrored to `localStorage` for fast early paint).
 
 ## Palette commands
 
+Open with `Cmd+Shift+P` (or `/` while not typing). Tab completes, ↑↓ navigate suggestions/history, ↵ runs the highlighted suggestion, and suggestions are clickable. `:help` shows the full annotated list.
+
 ```text
-:help
-:focus message
-:focus search
-:theme green
-:theme amber
-:theme cyan
-:theme mono
-:compact on
-:compact off
-:unread
-:reload
+:help                         show the command list
+:search [query]               open the search overlay (alias :s)
+:focus message|search         focus the composer or messenger search
+:goto <name>                  open the first chat matching <name> (alias :c)
+:theme <name>                 green|amber|cyan|mono|mocha|twilight|neon|macchiato|frappe|latte
+:ultra [on|off]               ultra terminal mode
+:vanilla [on|off]             disable/enable the terminal skin
+:opacity <20-100>             window transparency
+:mute [on|off]                mute window audio
+:density compact|cozy|comfy   message log spacing
+:fontsize <n>|+|-             chat font size in px
+:sent-color [on|off]          accent-color outgoing messages
+:bottom / :top                scroll the open chat
+:unread                       open the first chat that looks unread
+:filter all|unread            filter the chat list
+:pin / :mark-unread / :mute-chat   act on the j/k-cursored chat
+:notifications                open the in-session toast log (alias :log)
+:reload                       reload the page
+:q                            close the palette
 ```
 
 ## Configuration
@@ -121,7 +131,7 @@ Edit `config/app.json`:
 {
   "homeUrl": "https://www.facebook.com/messages",
   "theme": "green",
-  "compactByDefault": true
+  "window": { "width": 1280, "height": 860 }
 }
 ```
 
@@ -131,7 +141,7 @@ You can swap `homeUrl` to `https://www.messenger.com/` if that works better in y
 
 - **Terminal mode** (default) — full skin: terminal palette, statusline, ultra/compact layout, message-row tagging, hover-toolbar repositioning, reply-quote dimming.
 - **Ultra mode** — terminal mode + hides the chat list, header chrome, and side rails so only the active conversation + composer are on screen. Toggle with `Cmd+Shift+U`.
-- **Vanilla mode** — strips every `tm-*` class from `<html>`/`<body>` and removes the statusline, restoring Facebook's native Messenger UI without unloading anything. Toggle with `Cmd+Shift+Y` to flip back to terminal mode.
+- **Vanilla mode** — strips every `tm-*` class from `<html>`/`<body>` and removes the statusline, restoring Facebook's native Messenger UI without unloading anything. Toggle with `Cmd+Shift+Y` (or `:vanilla` from the palette) to flip back to terminal mode.
 
 ## Privacy and safety model
 

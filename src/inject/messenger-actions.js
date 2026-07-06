@@ -85,6 +85,26 @@ function setChatListCursor(row) {
   }
 }
 
+/* clicking a chat row with the mouse leaves the keyboard cursor's box
+   stranded on whatever row j/k last touched - the user reads it as a
+   highlight they can't dismiss. on any pointerdown inside the chat list,
+   drop the visual cursor and silently re-anchor to the clicked row so a
+   later j/k continues from where the mouse left off rather than the top. */
+let chatListCursorReleaseBound = false;
+function bindChatListCursorRelease() {
+  if (chatListCursorReleaseBound) return;
+  chatListCursorReleaseBound = true;
+  document.addEventListener('pointerdown', (event) => {
+    if (!chatListCursorRow) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (!target.closest('[data-tm-chat-list]')) return;
+    chatListCursorRow.removeAttribute('data-tm-chat-cursor');
+    const clickedRow = target.closest('[data-tm-chat-list] [role="row"]');
+    chatListCursorRow = clickedRow ?? null;
+  }, true);
+}
+
 function moveChatListCursor(direction) {
   const rows = getChatListRows();
   if (rows.length === 0) {
@@ -103,7 +123,10 @@ function moveChatListCursor(direction) {
 }
 
 function openChatListCursorTarget() {
-  if (!chatListCursorRow) {
+  /* fb's virtualised list can detach the cursored row between the j/k
+     move and the Enter press - clicking a detached node silently no-ops,
+     which reads as "Enter is broken". surface it instead. */
+  if (!chatListCursorRow || !document.contains(chatListCursorRow)) {
     showToast('no chat selected');
     return false;
   }
