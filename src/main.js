@@ -58,12 +58,45 @@ function registerIpcHandlers() {
   });
 }
 
+/* dev-only live-debug bridge, enabled by TM_DEBUG_EVAL_FILE=<path>. polls
+   the file; when its contents change, runs them as JS in the messenger
+   renderer, writes the result to <path>.out and a window screenshot to
+   <path>.png. lets layout work be inspected/iterated against the real fb
+   DOM from a terminal without devtools. inert unless the env var is set. */
+function setupDebugEvalBridge(messengerWindow) {
+  const evalFilePath = process.env.TM_DEBUG_EVAL_FILE;
+  if (!evalFilePath) return;
+  const fs = require('node:fs');
+  let lastEvalContent = '';
+  const pollTimer = setInterval(async () => {
+    if (messengerWindow.isDestroyed()) { clearInterval(pollTimer); return; }
+    let content;
+    try { content = fs.readFileSync(evalFilePath, 'utf8'); } catch { return; }
+    if (!content.trim() || content === lastEvalContent) return;
+    lastEvalContent = content;
+    try {
+      const result = await messengerWindow.webContents.executeJavaScript(content, true);
+      fs.writeFileSync(
+        `${evalFilePath}.out`,
+        typeof result === 'string' ? result : JSON.stringify(result, null, 2) ?? String(result)
+      );
+    } catch (error) {
+      fs.writeFileSync(`${evalFilePath}.out`, `ERROR: ${error.message}`);
+    }
+    try {
+      const image = await messengerWindow.webContents.capturePage();
+      fs.writeFileSync(`${evalFilePath}.png`, image.toPNG());
+    } catch {}
+  }, 400);
+}
+
 app.whenReady().then(() => {
   storedSettings = loadStoredSettings();
   buildApplicationMenu(appConfig);
   configurePersistentSession();
   registerIpcHandlers();
-  createMessengerWindow(appConfig, SESSION_PARTITION, storedSettings);
+  const messengerWindow = createMessengerWindow(appConfig, SESSION_PARTITION, storedSettings);
+  setupDebugEvalBridge(messengerWindow);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

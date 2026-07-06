@@ -17,9 +17,9 @@ function safeOpenExternal(url) {
   shell.openExternal(url);
 }
 /* fb messenger leaks renderer memory over long sessions (large react tree,
-   scroll-virtualised log backbuffer, retained media). reload every 30m
+   scroll-virtualised log backbuffer, retained media). reload every hour
    while the window is unfocused so we never interrupt active typing. */
-const RENDERER_REFRESH_INTERVAL_MS = 30 * 60 * 1000;
+const RENDERER_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 
 /* this is the main-process keyboard pipeline (Electron's
    before-input-event). it duplicates inject/terminal.js handleKeyboardShortcut
@@ -42,8 +42,14 @@ function shortcutHandlerFor(input) {
   if (isPrimaryModifier && isShift && pressedKey === 's') return (win) => runRendererAction(win, 'openSearchOverlay');
   if (isPrimaryModifier && isShift && pressedKey === 'm') return (win) => runRendererAction(win, 'toggleMuted');
   if (isPrimaryModifier && isShift && pressedKey === 'y') return (win) => runRendererAction(win, 'toggleThemeDisabled');
-  if (isAlt && pressedKey === 'left') return (win) => { if (win.webContents.canGoBack()) win.webContents.goBack(); };
-  if (isAlt && pressedKey === 'right') return (win) => { if (win.webContents.canGoForward()) win.webContents.goForward(); };
+  /* Electron reports arrow keys as 'ArrowLeft'/'ArrowRight' (KeyboardEvent.key
+     semantics); accept the bare names too in case a build reports them. */
+  if (isAlt && (pressedKey === 'arrowleft' || pressedKey === 'left')) {
+    return (win) => { if (win.webContents.canGoBack()) win.webContents.goBack(); };
+  }
+  if (isAlt && (pressedKey === 'arrowright' || pressedKey === 'right')) {
+    return (win) => { if (win.webContents.canGoForward()) win.webContents.goForward(); };
+  }
 
   return null;
 }

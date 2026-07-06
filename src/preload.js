@@ -24,6 +24,7 @@ const EARLY_THEME_PALETTES = {
 };
 
 const EARLY_STYLE_ELEMENT_ID = 'tm-early-style';
+const EARLY_REVEAL_FALLBACK_MS = 4000;
 
 /* settings handed in from main via additionalArguments — survive even if
    Electron's localStorage gets purged (logout, partition reset, etc).
@@ -174,6 +175,13 @@ const activeTheme = readSavedTheme() ?? 'green';
 applyEarlyThemeClass(activeTheme, themeDisabled);
 if (!themeDisabled) {
   attachEarlyStyleWhenHeadExists(buildEarlyStyleElement(activeTheme));
+  /* safety valve: the early style keeps <body> hidden until the injection
+     bundle adds .tm-ready. if injection never runs (load error page, an
+     fb-side exception, executeJavaScript failure) the user would stare at
+     a blank window forever - reveal after a grace period regardless. */
+  setTimeout(() => {
+    document.documentElement?.classList.add('tm-ready');
+  }, EARLY_REVEAL_FALLBACK_MS);
 }
 
 /* re-apply persisted opacity early so the window doesn't flash to 100% then dim. */

@@ -435,7 +435,18 @@ function tagReplyQuotes() {
     + '[data-tm-thread] [aria-roledescription="message"]'
   );
   for (const row of rows) {
-    if (row.querySelector('[data-tm-reply-quote]')) continue;
+    const existingQuote = row.querySelector('[data-tm-reply-quote]');
+    if (existingQuote) {
+      /* re-run on every pass, not just at tag time: fb re-renders the
+         response subtree in place, replacing the tagged elements. both
+         the hint wrapper and the media preview carry the quote tag, so
+         select the media-carrying one specifically. */
+      const mediaQuote = row.querySelector(
+        '[data-tm-reply-quote]:has(img), [data-tm-reply-quote]:has(video), [data-tm-reply-quote]:has(picture)'
+      );
+      if (mediaQuote) restructureMediaReply(mediaQuote);
+      continue;
+    }
 
     const hintElement = findReplyHintElement(row);
     if (!hintElement) continue;
@@ -491,7 +502,131 @@ function tagReplyQuotes() {
       candidate = candidate.nextElementSibling;
     }
     const quote = mediaQuote ?? textQuote;
-    if (quote) quote.setAttribute('data-tm-reply-quote', 'true');
+    if (quote) {
+      quote.setAttribute('data-tm-reply-quote', 'true');
+      if (mediaQuote) restructureMediaReply(quote);
+    }
+  }
+}
+
+/* fb positions the response bubble of an image/video reply with an offset
+   it computed from ITS OWN measured preview size. under the terminal theme
+   the preview renders at a different size (font metrics, stripped chrome),
+   so fb's offset lands the reply text overlapping the image's bottom strip
+   - and native messenger's opaque bubble that would hide the overlap is
+   transparent here. do NOT try to zero fb's margins/transforms wholesale:
+   that offset is also what places the text below the preview at all, and
+   killing it hid the reply text behind the image entirely. instead measure
+   the actual rendered overlap between the media and the reply text and
+   push the text down by exactly that amount.
+
+   idempotent by re-measurement: once shifted, the next pass measures no
+   overlap and does nothing. if fb re-renders and wipes the inline margin,
+   the overlap reappears and gets re-fixed. the dataset accumulator caps
+   total adjustment so a pathological layout (e.g. fb re-adding its offset
+   on top of ours every frame) can't ratchet the text off the screen. */
+/* the response text wrapper lives among the quote's siblings, but its
+   position varies by build/direction: sometimes after the media preview,
+   sometimes between the hint and the preview. scan ALL siblings for the
+   text-bearing one (a forward-only walk missed it in this build). skips
+   the hint line, our injected timestamp, and reaction badges - none of
+   those are the reply body. */
+function findReplyResponseElement(quote) {
+  const parent = quote.parentElement;
+  if (!parent) return null;
+  for (const sibling of parent.children) {
+    if (sibling === quote) continue;
+    if (sibling.hasAttribute('data-tm-reply-quote')) continue;
+    if (sibling.hasAttribute('data-tm-msg-timestamp')) continue;
+    if (sibling.hasAttribute('data-tm-action-toolbar')) continue;
+    if (/reaction/i.test(sibling.getAttribute('aria-label') ?? '')) continue;
+    const text = (sibling.textContent ?? '').trim();
+    if (text.length < 1) continue;
+    if (REPLY_HINT_PATTERN.test(text)) continue;
+    return sibling;
+  }
+  return null;
+}
+
+/* fb lays the preview + reply-text cluster out with offsets computed from
+   ITS OWN measured sizes; under the terminal theme those sizes differ, so
+   the text landed on the image's bottom strip. nudging individual offsets
+   proved unwinnable (clearing them hid the text behind the image; margin
+   corrections can ratchet when fb recomputes). instead replace the
+   cluster's layout wholesale with a flex column - hint, then preview,
+   then reply text - so fb's computed offsets stop mattering.
+
+   the layout is applied as INLINE styles rather than stylesheet rules:
+   a CSS attempt at this needed structural selectors (direction ancestor,
+   child order) that silently missed in practice - e.g. the cluster parent
+   can itself be the [data-tm-direction] element, which a descendant
+   selector never matches. closest() includes the element itself, and
+   inline !important beats every stylesheet rule, ours or fb's. re-applied
+   every pass; setting identical values is a cheap no-op. */
+function restructureMediaReply(quote) {
+  const media = quote.querySelector('img, video, picture');
+  if (!media) return;
+  const response = findReplyResponseElement(quote);
+  if (!response) return;
+  const parent = quote.parentElement;
+  if (!parent) return;
+
+  response.setAttribute('data-tm-reply-response', 'true');
+  parent.setAttribute('data-tm-media-reply', 'true');
+
+  const direction = parent.closest('[data-tm-direction]')?.getAttribute('data-tm-direction') ?? 'in';
+  const setStyle = (element, property, value) => element.style.setProperty(property, value, 'important');
+
+  setStyle(parent, 'display', 'flex');
+  setStyle(parent, 'flex-direction', 'column');
+  setStyle(parent, 'align-items', direction === 'out' ? 'flex-end' : 'flex-start');
+  setStyle(parent, 'gap', '3px');
+  setStyle(parent, 'height', 'auto');
+  setStyle(parent, 'min-height', '0');
+  setStyle(parent, 'max-height', 'none');
+
+  for (const child of parent.children) {
+    /* leave fb's overlay chrome alone: the hover action toolbar and
+       reaction badges are absolutely positioned by fb and must NOT be
+       pulled into the flex flow - forcing them static + order:0 would pin
+       them to the top of the stack, always visible. same skip list as
+       findReplyResponseElement above. */
+    if (child.hasAttribute('data-tm-action-toolbar')) continue;
+    if (/reaction/i.test(child.getAttribute('aria-label') ?? '')) continue;
+
+    /* collapse fb's now-purposeless spacer/offset helpers: with the manual
+       layout gone, a child with no text and no visual content is dead
+       vertical space in the stack. */
+    if (child !== quote && child !== response
+      && !(child.textContent ?? '').trim()
+      && !child.querySelector('img, video, picture, svg, i[data-visualcompletion="css-img"]')) {
+      setStyle(child, 'display', 'none');
+      continue;
+    }
+    setStyle(child, 'position', 'static');
+    setStyle(child, 'transform', 'none');
+    setStyle(child, 'margin', '0');
+    let order = '0';
+    if (child === response) order = '3';
+    else if (child === quote) order = '2';
+    else if (child.hasAttribute('data-tm-reply-quote')) order = '1'; /* hint wrapper */
+    else if (child.hasAttribute('data-tm-msg-timestamp')) order = '4';
+    setStyle(child, 'order', order);
+  }
+
+  /* fb offsets the reply text again INSIDE the response wrapper (the text
+     rendered above its own wrapper's border, and the stray positioning
+     kept the wrapper from shrink-wrapping the text). with the wrapper's
+     flow position now owned by the flex stack, flattening its subtree is
+     safe - computed-style checks so we only write where fb actually
+     offsets. */
+  setStyle(response, 'height', 'auto');
+  for (const node of response.querySelectorAll('*')) {
+    const computed = window.getComputedStyle(node);
+    if (computed.position !== 'static') setStyle(node, 'position', 'static');
+    if (computed.transform !== 'none') setStyle(node, 'transform', 'none');
+    if (parseFloat(computed.marginTop) < 0) setStyle(node, 'margin-top', '0');
+    if (parseFloat(computed.marginBottom) < 0) setStyle(node, 'margin-bottom', '0');
   }
 }
 

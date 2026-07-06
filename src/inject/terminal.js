@@ -147,22 +147,34 @@ function bindMessageFocusReleaser() {
   function handleBackgroundPointerDown(event) {
     const target = event.target;
     if (!(target instanceof Element)) return;
-    /* preserve focus when the user clicks something interactive - any
-       message bubble (they may want to long-press to react), the open
-       toolbar/menu, the composer, or the search box */
+
+    /* only relevant while focus is lingering inside a message bubble */
+    const active = document.activeElement;
+    if (!active || active === document.body) return;
+    if (active.matches('input, textarea, [contenteditable="true"], [role="textbox"]')) return;
+    const focusedMessage = active.closest('[aria-roledescription="message"], [role="article"]');
+    if (!focusedMessage) return;
+
+    /* keep focus for interactions that operate ON the focused message:
+       clicks inside that same message (react/reply/long-press), the
+       popped-out menu/reaction picker/dialog/toolbar, and text inputs.
+       everything else - the log background, ANOTHER message, the chat
+       list - releases the highlight. the previous exclusion list here
+       included [role="button"]/[role="link"]/any message, which matches
+       nearly every pixel of fb's DOM, so "click off to dismiss" almost
+       never actually fired. */
     if (target.closest(
-      '[aria-roledescription="message"],'
-      + '[role="article"],'
-      + '[role="menu"],'
+      '[role="menu"],'
       + '[role="menuitem"],'
       + '[role="dialog"],'
       + '[role="toolbar"],'
-      + '[role="button"],'
-      + '[role="link"],'
       + '[role="textbox"],'
       + 'input, textarea, [contenteditable="true"]'
     )) return;
-    releaseLingeringMessageFocus();
+    const targetMessage = target.closest('[aria-roledescription="message"], [role="article"]');
+    if (targetMessage === focusedMessage) return;
+
+    active.blur();
   }
 
   window.addEventListener('blur', releaseLingeringMessageFocus, true);
@@ -309,6 +321,7 @@ function start() {
   bindMediaViewerEvents();
   bindImageCollapseHandler();
   bindMessageFocusReleaser();
+  bindChatListCursorRelease();
   bindManualSelectionDriver();
   startMutationObserver();
   startStatuslineClock();
