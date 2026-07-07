@@ -46,10 +46,39 @@ function ensureMediaViewerRoot() {
   const img = root.querySelector('.tm-media-viewer-img');
   if (img) {
     img.addEventListener('load', () => setMediaViewerStatus(''));
-    img.addEventListener('error', () => setMediaViewerStatus('failed to load'));
+    img.addEventListener('error', () => {
+      if (tryBitmapFallback(img)) return;
+      setMediaViewerStatus('failed to load');
+    });
   }
 
   return root;
+}
+
+/* e2ee threads decrypt attachments into blob: URLs that fb may revoke once
+   the inline <img> has rendered - re-fetching the URL for our viewer then
+   fails even though the inline image still shows its decoded bitmap.
+   snapshot that bitmap through a canvas instead. blob URLs share the page
+   origin, so the canvas stays untainted. one attempt per open (the
+   dataset flag) so a genuinely broken image can't loop error -> retry. */
+function tryBitmapFallback(viewerImg) {
+  const source = currentViewerImage;
+  if (!source || !source.isConnected) return false;
+  if (viewerImg.dataset.tmBitmapFallback === 'true') return false;
+  const width = source.naturalWidth;
+  const height = source.naturalHeight;
+  if (!width || !height) return false;
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d').drawImage(source, 0, 0);
+    viewerImg.dataset.tmBitmapFallback = 'true';
+    viewerImg.src = canvas.toDataURL('image/png');
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function setMediaViewerStatus(message) {
@@ -142,6 +171,7 @@ function openMediaViewer(imgElement) {
   /* show "loading…" until the image's load event clears it. cleared on
      error too so the user isn't left staring at a half-rendered viewer. */
   setMediaViewerStatus('loading…');
+  delete img.dataset.tmBitmapFallback;
   img.src = src;
   img.classList.remove('tm-media-viewer-hidden');
   const altText = imgElement.getAttribute('alt')?.trim();
@@ -336,7 +366,18 @@ function findVideoForPosterImage(imgElement) {
   return wrapper.querySelector('video');
 }
 
+/* native-lightbox mode: current fb builds (group chats AND e2ee DMs)
+   render the lightbox inside a proper [role='dialog'] portal that the
+   theme's dialog rules style correctly - and fb's viewer beats this
+   built-in one (whole-thread carousel, fullscreen video player). so the
+   click interception is OFF and media clicks flow to fb untouched. the
+   custom viewer below is kept dormant for builds where fb's portal
+   renders broken again (the body-level no-role portal this file was
+   originally written against) - flip the flag to re-enable it. */
+const TM_INTERCEPT_MEDIA_CLICKS = false;
+
 function handleDocumentClick(event) {
+  if (!TM_INTERCEPT_MEDIA_CLICKS) return;
   const target = event.target;
   if (!(target instanceof Element)) return;
   const logScope = target.closest('[role="log"], [data-tm-thread]');
@@ -416,6 +457,12 @@ function handleViewerKeyboard(event) {
 function bindMediaViewerEvents() {
   if (mediaViewerBound) return;
   mediaViewerBound = true;
-  document.addEventListener('click', handleDocumentClick, true);
-  document.addEventListener('keydown', handleViewerKeyboard, true);
+  /* bind on WINDOW, not document: fb's e2ee threads register their own
+     capture-phase click listener on document before our injection runs,
+     and stopImmediatePropagation can't cancel a listener that already
+     fired - so a DM photo click opened fb's (theme-broken) lightbox ON
+     TOP of our viewer. the capture phase visits window before document
+     regardless of registration order, so this always runs first. */
+  window.addEventListener('click', handleDocumentClick, true);
+  window.addEventListener('keydown', handleViewerKeyboard, true);
 }

@@ -123,7 +123,19 @@ function bindKeyboardShortcuts() {
 function startMutationObserver() {
   if (mutationObserverStarted || !document.body) return;
   mutationObserverStarted = true;
-  new MutationObserver(scheduleApply).observe(document.body, { childList: true, subtree: true });
+  /* childList catches subtree swaps, but React re-renders often rewrite
+     the style attribute IN PLACE (no node churn) - wiping the inline
+     layout restructureMediaReply applied to media-reply rows, which then
+     stayed raw (reply text overlapping the thumbnail) until an unrelated
+     mutation happened to fire. watch style attributes too; filtered to
+     style only, and per-pass writers skip identical values, so our own
+     apply passes don't re-trigger the observer in a loop. */
+  new MutationObserver(scheduleApply).observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['style'],
+  });
 }
 
 /* fb keeps DOM focus on a message bubble after the user clicks reply, and
@@ -176,6 +188,15 @@ function bindMessageFocusReleaser() {
 
     active.blur();
   }
+
+  /* NOTE: an earlier iteration auto-blurred row/bubble focus the moment
+     it landed (focusin listener). that FOUGHT fb's focus manager: fb
+     restores the focus its state says it owns, every restore re-runs
+     scroll-into-view, and the log kept snapping back to the jumped-to
+     message while clicks appeared dead (fb's own click-to-release -
+     data-release-focus-from="CLICK" - never saw a stable focus to
+     release). so: leave fb's focus lifecycle alone and just keep the
+     ring invisible via CSS; fb itself releases on the next click. */
 
   window.addEventListener('blur', releaseLingeringMessageFocus, true);
   window.addEventListener('focus', releaseLingeringMessageFocus, true);
@@ -313,11 +334,27 @@ function bindManualSelectionDriver() {
   }, true);
 }
 
+/* the shell builds the right-click menu from Electron's context-menu event,
+   which never fires if the page cancels the contextmenu event - and fb
+   suppresses it across much of the app. window-capture runs before any
+   document-level listener fb registers, so stopping propagation here keeps
+   fb's handlers from ever seeing the event while the browser default (the
+   shell's menu request) proceeds untouched. */
+let nativeContextMenuGuardBound = false;
+function bindNativeContextMenuGuard() {
+  if (nativeContextMenuGuardBound) return;
+  nativeContextMenuGuardBound = true;
+  window.addEventListener('contextmenu', (event) => {
+    event.stopImmediatePropagation();
+  }, true);
+}
+
 function start() {
   applyDocumentTheme();
   applyWindowOpacity(settings.opacityPct);
   applyWindowMuted(settings.muted);
   bindKeyboardShortcuts();
+  bindNativeContextMenuGuard();
   bindMediaViewerEvents();
   bindImageCollapseHandler();
   bindMessageFocusReleaser();

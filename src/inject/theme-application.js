@@ -91,6 +91,7 @@ function applyDocumentTheme() {
   tagComposerHost();
   tagComposerPlaceholder();
   tagComposerReplyPreview();
+  tagFbMediaViewer();
   tagDaySeparators();
   tagMessageTimestamps();
   tagLinkPreviewHosts();

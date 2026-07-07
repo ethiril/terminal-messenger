@@ -1,5 +1,5 @@
 const path = require('node:path');
-const { BrowserWindow, shell } = require('electron');
+const { BrowserWindow, Menu, clipboard, shell } = require('electron');
 const { isAllowedMessengerUrl } = require('./app-config');
 const { injectTerminalLayer } = require('./injection-bundle');
 const { runRendererAction } = require('./renderer-bridge');
@@ -52,6 +52,73 @@ function shortcutHandlerFor(input) {
   }
 
   return null;
+}
+
+/* Electron shows NO context menu unless the app builds one, so right-click
+   was dead app-wide: no spellcheck corrections, no image copy, no
+   cut/copy/paste. build a minimal menu from the context-menu params.
+   (the renderer side stops fb's own contextmenu handlers from cancelling
+   the event - see bindNativeContextMenuGuard in inject/terminal.js.) */
+function bindContextMenu(messengerWindow) {
+  messengerWindow.webContents.on('context-menu', (_event, params) => {
+    const template = [];
+
+    for (const suggestion of (params.dictionarySuggestions ?? []).slice(0, 5)) {
+      template.push({
+        label: suggestion,
+        click: () => messengerWindow.webContents.replaceMisspelling(suggestion)
+      });
+    }
+    if (params.misspelledWord) {
+      template.push({
+        label: 'Add to Dictionary',
+        click: () => messengerWindow.webContents.session.addWordToSpellCheckerDictionary(params.misspelledWord)
+      });
+      template.push({ type: 'separator' });
+    }
+
+    if (params.mediaType === 'image') {
+      /* copyImageAt grabs the decoded bitmap at the click point - works for
+         e2ee blob: images whose URL can't be re-fetched. */
+      template.push({
+        label: 'Copy Image',
+        click: () => messengerWindow.webContents.copyImageAt(params.x, params.y)
+      });
+      if (params.srcURL && /^https?:/i.test(params.srcURL)) {
+        template.push({
+          label: 'Copy Image Address',
+          click: () => clipboard.writeText(params.srcURL)
+        });
+      }
+      template.push({ type: 'separator' });
+    }
+
+    if (params.linkURL) {
+      template.push({
+        label: 'Copy Link Address',
+        click: () => clipboard.writeText(params.linkURL)
+      });
+      template.push({ type: 'separator' });
+    }
+
+    if (params.isEditable) {
+      template.push(
+        { role: 'cut', enabled: params.editFlags.canCut },
+        { role: 'copy', enabled: params.editFlags.canCopy },
+        { role: 'paste', enabled: params.editFlags.canPaste },
+        { type: 'separator' },
+        { role: 'selectAll' }
+      );
+    } else if ((params.selectionText ?? '').trim()) {
+      template.push({ role: 'copy' });
+    }
+
+    while (template.length && template[template.length - 1].type === 'separator') {
+      template.pop();
+    }
+    if (!template.length) return;
+    Menu.buildFromTemplate(template).popup({ window: messengerWindow });
+  });
 }
 
 function formatTitleWithUnreadCount(updatedTitle) {
@@ -122,6 +189,8 @@ function createMessengerWindow(appConfig, sessionPartition, storedSettings = {})
     await injectTerminalLayer(messengerWindow, appConfig);
     showOnceReady();
   });
+
+  bindContextMenu(messengerWindow);
 
   messengerWindow.webContents.on('before-input-event', (event, input) => {
     const handler = shortcutHandlerFor(input);

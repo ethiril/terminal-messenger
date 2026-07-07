@@ -259,6 +259,52 @@ body.tm-terminal-theme [aria-modal='true']:has(input):has(img) video {
   max-height: revert !important;
 }
 
+/* the full emoji picker (opened from the reaction bar's "+" -> "Search
+   emoji") shrink-to-fits to just its search-bar width (~274px): the emoji
+   grid and the "Your reactions" strip sit inside fb wrappers with
+   overflow-x: hidden, so their true ~500px width never pushes the popover
+   wider - every emoji column past the ~6th is clipped at the right edge.
+   anchor on the "Search emoji" input and give it a width that hugs fb's
+   6-column grid (~272px of tiles + chrome), so no column is clipped and no
+   dead space trails the grid. the grid sits behind an overflow:auto
+   scroller, so max-content/fit-content can't see it - an explicit width is
+   the reliable lever. capped to the viewport. give it the GIF-picker-style
+   outline chrome (no box-model width theft) too. */
+body.tm-terminal-theme [role='dialog']:has(input[placeholder*='emoji' i]),
+body.tm-terminal-theme [role='dialog']:has(input[aria-label*='emoji' i]),
+body.tm-terminal-theme [aria-modal='true']:has(input[placeholder*='emoji' i]),
+body.tm-terminal-theme [aria-modal='true']:has(input[aria-label*='emoji' i]) {
+  width: 280px !important;
+  max-width: 96vw !important;
+  padding: 0 !important;
+  border: none !important;
+  outline: 1px solid var(--tm-dim) !important;
+  outline-offset: -1px !important;
+}
+
+/* the global [role='row'] / [role='gridcell'] padding+height rules (tuned for
+   the chat list) also match the emoji picker's grid, inflating every tile
+   cell and widening each row past the popover. restore fb's own cell metrics
+   inside the picker so the grid lays out at its intended size. */
+body.tm-terminal-theme [role='dialog']:has(input[placeholder*='emoji' i]) [role='row'],
+body.tm-terminal-theme [role='dialog']:has(input[placeholder*='emoji' i]) [role='gridcell'],
+body.tm-terminal-theme [role='dialog']:has(input[placeholder*='emoji' i]) [role='listitem'],
+body.tm-terminal-theme [role='dialog']:has(input[aria-label*='emoji' i]) [role='row'],
+body.tm-terminal-theme [role='dialog']:has(input[aria-label*='emoji' i]) [role='gridcell'],
+body.tm-terminal-theme [role='dialog']:has(input[aria-label*='emoji' i]) [role='listitem'],
+body.tm-terminal-theme [aria-modal='true']:has(input[placeholder*='emoji' i]) [role='row'],
+body.tm-terminal-theme [aria-modal='true']:has(input[placeholder*='emoji' i]) [role='gridcell'],
+body.tm-terminal-theme [aria-modal='true']:has(input[placeholder*='emoji' i]) [role='listitem'],
+body.tm-terminal-theme [aria-modal='true']:has(input[aria-label*='emoji' i]) [role='row'],
+body.tm-terminal-theme [aria-modal='true']:has(input[aria-label*='emoji' i]) [role='gridcell'],
+body.tm-terminal-theme [aria-modal='true']:has(input[aria-label*='emoji' i]) [role='listitem'] {
+  padding: revert !important;
+  margin: revert !important;
+  min-height: revert !important;
+  height: revert !important;
+  line-height: revert !important;
+}
+
 /* the inline reaction picker ("❤️ 😂 😮 😢 😠 👍 +") opens as a tight strip
    with the global div crush stripping its breathing room - explicit gap +
    inner padding keeps each emoji separated from the next and from the border */
@@ -440,6 +486,43 @@ body.tm-terminal-theme svg {
   opacity: 0.85 !important;
 }
 
+/* the emoji picker's foot is a category-nav strip of [role='button']s whose
+   icons are <svg fill="currentColor"><path></svg>. fb paints them via an
+   icon-color var that resolves to black in our theme, on a rule that beats
+   the low-specificity global `svg` rule above - so they read as near-black
+   against the dark popover. re-assert the muted tone at high specificity
+   (dialog + emoji-input + button scope) on both the svg and its path so we
+   win the cascade; the active/hovered category lights up to the accent. */
+body.tm-terminal-theme [role='dialog']:has(input[placeholder*='emoji' i]) [role='button'] svg,
+body.tm-terminal-theme [role='dialog']:has(input[placeholder*='emoji' i]) [role='button'] svg *,
+body.tm-terminal-theme [role='dialog']:has(input[aria-label*='emoji' i]) [role='button'] svg,
+body.tm-terminal-theme [role='dialog']:has(input[aria-label*='emoji' i]) [role='button'] svg *,
+body.tm-terminal-theme [aria-modal='true']:has(input[placeholder*='emoji' i]) [role='button'] svg,
+body.tm-terminal-theme [aria-modal='true']:has(input[placeholder*='emoji' i]) [role='button'] svg *,
+body.tm-terminal-theme [aria-modal='true']:has(input[aria-label*='emoji' i]) [role='button'] svg,
+body.tm-terminal-theme [aria-modal='true']:has(input[aria-label*='emoji' i]) [role='button'] svg * {
+  fill: var(--tm-muted) !important;
+  stroke: var(--tm-muted) !important;
+  color: var(--tm-muted) !important;
+}
+
+body.tm-terminal-theme [role='dialog']:has(input[placeholder*='emoji' i]) [role='button']:hover svg,
+body.tm-terminal-theme [role='dialog']:has(input[placeholder*='emoji' i]) [role='button']:hover svg *,
+body.tm-terminal-theme [role='dialog']:has(input[placeholder*='emoji' i]) [role='button'][aria-selected='true'] svg,
+body.tm-terminal-theme [role='dialog']:has(input[placeholder*='emoji' i]) [role='button'][aria-selected='true'] svg *,
+body.tm-terminal-theme [role='dialog']:has(input[aria-label*='emoji' i]) [role='button']:hover svg,
+body.tm-terminal-theme [role='dialog']:has(input[aria-label*='emoji' i]) [role='button']:hover svg *,
+body.tm-terminal-theme [role='dialog']:has(input[aria-label*='emoji' i]) [role='button'][aria-selected='true'] svg,
+body.tm-terminal-theme [role='dialog']:has(input[aria-label*='emoji' i]) [role='button'][aria-selected='true'] svg *,
+body.tm-terminal-theme [aria-modal='true']:has(input[placeholder*='emoji' i]) [role='button']:hover svg,
+body.tm-terminal-theme [aria-modal='true']:has(input[placeholder*='emoji' i]) [role='button']:hover svg *,
+body.tm-terminal-theme [aria-modal='true']:has(input[aria-label*='emoji' i]) [role='button']:hover svg,
+body.tm-terminal-theme [aria-modal='true']:has(input[aria-label*='emoji' i]) [role='button']:hover svg * {
+  fill: var(--tm-accent) !important;
+  stroke: var(--tm-accent) !important;
+  color: var(--tm-accent) !important;
+}
+
 body.tm-terminal-theme [role='button']:hover svg,
 body.tm-terminal-theme [role='button']:hover svg *,
 body.tm-terminal-theme [role='link']:hover svg,
@@ -529,7 +612,8 @@ body.tm-terminal-theme img[data-tm-img-collapsed='true'] {
   display: none !important;
 }
 
-body.tm-terminal-theme [role='log'] img[data-tm-img-size='small'] {
+body.tm-terminal-theme [role='log'] img[data-tm-img-size='small'],
+body.tm-terminal-theme [data-tm-thread] img[data-tm-img-size='small'] {
   width: 12px !important;
   height: 12px !important;
   max-width: 12px !important;
@@ -608,7 +692,8 @@ body.tm-terminal-theme [data-tm-chat-list] [role='gridcell'] *:has(> svg) {
 
 /* center wrappers around small badges so the badge doesn't push to the top
    of a flex row */
-body.tm-terminal-theme [role='log'] *:has(> img[data-tm-img-size='small']) {
+body.tm-terminal-theme [role='log'] *:has(> img[data-tm-img-size='small']),
+body.tm-terminal-theme [data-tm-thread] *:has(> img[data-tm-img-size='small']) {
   align-self: center !important;
   align-items: center !important;
 }
@@ -1123,6 +1208,60 @@ body.tm-terminal-theme [role='tooltip'] {
   display: none !important;
 }
 
+/* fb focuses the jumped-to row after "Go to replied message" and draws a
+   focus ring around it; rows span the full log width, so there is no
+   background to click and the ring read as a stuck highlight. the focus
+   itself is released in JS (bindMessageFocusReleaser) - suppress the ring
+   too so the row never flashes a box the theme can't dismiss. */
+body.tm-terminal-theme [role='log'] [role='row']:focus,
+body.tm-terminal-theme [role='log'] [role='row']:focus-visible,
+body.tm-terminal-theme [data-tm-thread] [role='row']:focus,
+body.tm-terminal-theme [data-tm-thread] [role='row']:focus-visible,
+body.tm-terminal-theme [aria-roledescription='message']:focus,
+body.tm-terminal-theme [aria-roledescription='message']:focus-visible,
+body.tm-terminal-theme [role='article']:focus,
+body.tm-terminal-theme [role='article']:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* fb draws the jump-to-message flash as pseudo-element overlays on the
+   bubble wrapper (the __fb-dark-mode element) - a 2px white border plus
+   a dark fill - then animates them away. the theme strips all
+   transitions/animations, so the flash froze at full opacity as a
+   permanent box (white; black once only the border was neutralized).
+   remove the pseudo-elements outright; the jump still scrolls to the
+   message, it just doesn't flash. */
+body.tm-terminal-theme [role='log'] .__fb-dark-mode::after,
+body.tm-terminal-theme [role='log'] .__fb-dark-mode::before,
+body.tm-terminal-theme [role='log'] .__fb-light-mode::after,
+body.tm-terminal-theme [role='log'] .__fb-light-mode::before,
+body.tm-terminal-theme [data-tm-thread] .__fb-dark-mode::after,
+body.tm-terminal-theme [data-tm-thread] .__fb-dark-mode::before,
+body.tm-terminal-theme [data-tm-thread] .__fb-light-mode::after,
+body.tm-terminal-theme [data-tm-thread] .__fb-light-mode::before {
+  content: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  display: none !important;
+}
+
+/* fb can also land the jump-focus on the BUBBLE wrapper - a
+   [role='button'][tabindex='-1'] inside the row - which drew the same
+   stuck white box hugging the bubble. tabindex=-1 elements can't be
+   keyboard-focused, so their ring is pure noise here. keyboard-reachable
+   controls (tabindex 0) keep their focus ring. */
+body.tm-terminal-theme [role='log'] [tabindex='-1']:focus,
+body.tm-terminal-theme [role='log'] [tabindex='-1']:focus-visible,
+body.tm-terminal-theme [data-tm-thread] [tabindex='-1']:focus,
+body.tm-terminal-theme [data-tm-thread] [tabindex='-1']:focus-visible,
+body.tm-terminal-theme [aria-roledescription='message'] [tabindex='-1']:focus,
+body.tm-terminal-theme [aria-roledescription='message'] [tabindex='-1']:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 /* doubled body class boosts specificity above the [data-tm-direction='in/out']
    color rules later in this file so reply quotes always read as dim. the
    leading border + indent is the visual anchor when fb's color overrides
@@ -1155,15 +1294,15 @@ body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] {
    edge - previously the reply text ("ahahaha...") visibly overlapped the
    bottom strip of the image because inline-block kept the text on the
    same line box as the image. block + margin-bottom gives clean
-   separation; the leading border-indent is dropped on media (no need to
-   mark an image as "quoted text") so the image displays at full width. */
+   separation. the leading quote rail (border-inline-start from the base
+   rule above) is deliberately KEPT on media quotes so the hint line and
+   the thumbnail share one visual "quoted context" rail, mirroring how
+   text quotes read. */
 body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote]:has(img),
 body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote]:has(video),
 body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote]:has(picture) {
   opacity: 1 !important;
   display: block !important;
-  border-inline-start: none !important;
-  padding-left: 0 !important;
   margin-bottom: 6px !important;
   width: fit-content !important;
 }
@@ -1177,13 +1316,17 @@ body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote]:has(picture) {
    the direction-tagged element, which a descendant selector never
    matches). CSS only owns the response bubble's visual skin below. */
 
-/* terminal-style bubble behind the reply text: mostly-opaque backing +
-   dim frame so the reply stays legible even if some fb layout we haven't
-   seen still lands it on the image. */
+/* the reply text is a regular message - render it PLAIN. the terminal
+   theme has no bubbles anywhere else, so the earlier opaque backing +
+   1px frame read as a stray grey box against the borderless log. the
+   quoted context above (hint + thumbnail) carries the visual grouping
+   via the shared left rail; overlap with the image is prevented by the
+   flex restructure, not by an opaque backing. */
 body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-response] {
-  background-color: color-mix(in srgb, var(--tm-bg) 85%, transparent) !important;
-  border: 1px solid var(--tm-dim) !important;
-  padding: 2px 8px !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  padding: 0 !important;
   width: fit-content !important;
   max-width: 100% !important;
   border-radius: 0 !important;
@@ -1210,6 +1353,199 @@ body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] div,
 body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] a {
   color: var(--tm-muted) !important;
   font-style: italic !important;
+}
+
+/* fb paints its replied-message backing card (--chat-replied-message-
+   background-color, a mid-grey slab sized to the whole quote strip) behind
+   the preview thumbnail. under the terminal theme the transparent-bubble
+   look leaves that slab exposed as a stray grey bar around the image -
+   strip every background inside the quote so the thumbnail sits bare on
+   the terminal background. */
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] div,
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] span {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* fb overlaps the preview card into the reply bubble below it (negative
+   bottom margin, the native "peek out from behind the bubble" design).
+   in our flex-column stack that just rams the thumbnail into the response
+   border - the row gap already provides the separation. */
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote]:has(img) > div,
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote]:has(video) > div,
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote]:has(picture) > div {
+  margin-bottom: 0 !important;
+}
+
+/* current fb builds nest the Message-actions hover toolbar INSIDE the
+   reply-response wrapper; left in flow it renders inside the reply bubble,
+   behind the bubble backing. anchoring to the ROW's edge parked it at the
+   far side of the full-width row, ~1200px from a left-aligned bubble - so
+   anchor to the bubble instead: restructureMediaReply sets the response
+   wrapper position:relative (inline), making it the nearest positioned
+   ancestor, and the toolbar floats 6px past the bubble's trailing edge,
+   matching where plain rows show their in-flow toolbar. */
+body.tm-terminal-theme [data-tm-media-reply] [role='toolbar'][aria-label='Message actions' i] {
+  position: absolute !important;
+  top: 50% !important;
+  left: calc(100% + 6px) !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translateY(-50%) !important;
+  z-index: 50 !important;
+  margin: 0 !important;
+  height: auto !important;
+  flex-direction: row !important;
+  white-space: nowrap !important;
+}
+
+body.tm-terminal-theme [data-tm-media-reply][data-tm-direction='out'] [role='toolbar'][aria-label='Message actions' i],
+body.tm-terminal-theme [data-tm-direction='out'] [data-tm-media-reply] [role='toolbar'][aria-label='Message actions' i] {
+  left: auto !important;
+  right: calc(100% + 6px) !important;
+}
+
+/* fb pads the preview cluster with empty gutter/filler columns (an avatar-
+   width spacer on the leading side and assorted zero-content pads), which
+   indent the thumbnail ~50px from the bubble's edge and leave the cluster
+   looking ragged. only the column actually holding the media matters -
+   drop the rest so the thumbnail sits flush with the reply bubble. */
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote]:has(img) > div > div:not(:has(img, video, picture)),
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote]:has(video) > div > div:not(:has(img, video, picture)),
+body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote]:has(picture) > div > div:not(:has(img, video, picture)) {
+  display: none !important;
+}
+
+/* ─── terminal skin for the reply preview ─── */
+
+/* quoted media is context, not content - render it the way text quotes
+   render (dimmed, secondary): desaturated + slightly translucent, framed
+   with the same dim 1px border the response bubble wears. hovering the
+   message restores the full-color thumbnail. small imgs (avatars) keep
+   their own treatment. */
+body.tm-terminal-theme [data-tm-reply-quote] img:not([data-tm-img-size='small']),
+body.tm-terminal-theme [data-tm-reply-quote] video,
+body.tm-terminal-theme [data-tm-reply-quote] picture {
+  filter: grayscale(0.8) brightness(0.85) contrast(1.05) !important;
+  opacity: 0.8 !important;
+  border: 1px solid var(--tm-dim) !important;
+  border-radius: 0 !important;
+}
+
+body.tm-terminal-theme [aria-roledescription='message']:hover [data-tm-reply-quote] img:not([data-tm-img-size='small']),
+body.tm-terminal-theme [aria-roledescription='message']:hover [data-tm-reply-quote] video,
+body.tm-terminal-theme [aria-roledescription='message']:hover [data-tm-reply-quote] picture,
+body.tm-terminal-theme [role='row']:hover [data-tm-reply-quote] img:not([data-tm-img-size='small']),
+body.tm-terminal-theme [role='row']:hover [data-tm-reply-quote] video,
+body.tm-terminal-theme [role='row']:hover [data-tm-reply-quote] picture {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+/* fb's reply-arrow icon next to "X replied to Y" is the only pictorial
+   glyph in an otherwise text-only chrome - swap it for a text arrow so
+   the hint reads like the rest of the terminal. */
+body.tm-terminal-theme [data-tm-reply-quote] h3 svg {
+  display: none !important;
+}
+
+/* the arrow must ride inline with the hint text: the h3's children are
+   block wrappers, so a ::before on the h3 itself got its own line box
+   and the glyph floated orphaned above the hint. the (hidden) svg's
+   wrapper is the flex cell that used to hold fb's icon - same slot,
+   same line as the text. */
+body.tm-terminal-theme [data-tm-reply-quote] h3 div:has(> svg)::before {
+  content: '\21B3';
+  color: var(--tm-muted);
+  font-style: italic;
+}
+
+/* fb indents the "X replied to Y" header ~64px with margins on the h3's
+   internal wrappers; with the thumbnail and reply text flush left that
+   stray indent made the cluster read as randomly scattered. flatten it
+   so the hint hugs the quote rail like every other quoted line. */
+body.tm-terminal-theme [data-tm-reply-quote] h3,
+body.tm-terminal-theme [data-tm-reply-quote] h3 div {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* fb caps the reply preview at 100px tall via its aspect-box machinery
+   (--x-maxHeight var + padding-bottom ratio + absolutely-filled img),
+   which turns portrait shots into ~75px slivers. bypass the machinery
+   inside reply quotes: kill the aspect box, put the media back in flow,
+   and let it size itself naturally up to a 160px-tall / 340px-wide cap
+   (auto width/height on a replaced element preserves aspect). */
+body.tm-terminal-theme [data-tm-reply-quote] [style*='--x-maxHeight'] {
+  max-height: none !important;
+  max-width: none !important;
+  width: fit-content !important;
+}
+
+body.tm-terminal-theme [data-tm-reply-quote] [style*='--x-paddingBottom'] {
+  padding-bottom: 0 !important;
+  height: auto !important;
+  width: fit-content !important;
+}
+
+body.tm-terminal-theme [data-tm-reply-quote] [style*='--x-paddingBottom'] > div {
+  position: static !important;
+  inset: auto !important;
+}
+
+body.tm-terminal-theme [data-tm-reply-quote] img:not([data-tm-img-size='small']),
+body.tm-terminal-theme [data-tm-reply-quote] video,
+body.tm-terminal-theme [data-tm-reply-quote] picture {
+  max-height: 160px !important;
+  max-width: min(340px, 100%) !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+}
+
+/* stylesheet mirror of restructureMediaReply's inline flex layout. React
+   re-renders rewrite the style attribute in place, and until the observer
+   heals the row it rendered raw - reply text overlapping the thumbnail.
+   the data-tm-* attributes DO survive those wipes (React only rewrites
+   props it rendered), so keying the same layout off them keeps the stack
+   intact even while the inline styles are gone. */
+body.tm-terminal-theme [data-tm-media-reply] {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 3px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+
+body.tm-terminal-theme [data-tm-media-reply][data-tm-direction='out'],
+body.tm-terminal-theme [data-tm-direction='out'] [data-tm-media-reply] {
+  align-items: flex-end !important;
+}
+
+body.tm-terminal-theme [data-tm-media-reply] > [data-tm-reply-quote] {
+  position: static !important;
+  transform: none !important;
+  order: 1 !important;
+}
+
+body.tm-terminal-theme [data-tm-media-reply] > [data-tm-reply-quote]:has(img),
+body.tm-terminal-theme [data-tm-media-reply] > [data-tm-reply-quote]:has(video),
+body.tm-terminal-theme [data-tm-media-reply] > [data-tm-reply-quote]:has(picture) {
+  order: 2 !important;
+}
+
+body.tm-terminal-theme [data-tm-media-reply] > [data-tm-reply-response] {
+  position: relative !important;
+  transform: none !important;
+  margin: 0 !important;
+  height: auto !important;
+  order: 3 !important;
+}
+
+body.tm-terminal-theme [data-tm-media-reply] > [data-tm-msg-timestamp] {
+  order: 4 !important;
 }
 
 /* the "Edited" affordance fb appends to edited messages renders as a
@@ -1932,6 +2268,73 @@ body.tm-terminal-theme [data-tm-search-flash='true'] [aria-roledescription='mess
 
 #tm-media-viewer-root .tm-media-viewer-img.tm-media-viewer-hidden {
   display: none !important;
+}
+
+/* ─── fb's native e2ee media viewer (tagged by tagFbMediaViewer) ─── */
+
+/* the viewer mounts inside the app root: ultra-mode layout collapses its
+   ancestor chain to a ~44px strip and the sitewide imagery hide (no
+   opt-in scope covers it) blanks every image. pin the shell fullscreen
+   above the terminal chrome and opt its media back in - this is the
+   carousel (thumbnails, prev/next, download, fullscreen video) that the
+   group-chat dialog-based viewer already gets for free. */
+body.tm-terminal-theme [data-tm-fb-lightbox] {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 2147483000 !important;
+  display: block !important;
+  background: rgba(0, 0, 0, 0.92) !important;
+}
+
+body.tm-terminal-theme [data-tm-fb-lightbox] img,
+body.tm-terminal-theme [data-tm-fb-lightbox] picture,
+body.tm-terminal-theme [data-tm-fb-lightbox] video,
+body.tm-terminal-theme [data-tm-fb-lightbox] canvas,
+body.tm-terminal-theme [data-tm-fb-lightbox] i[data-visualcompletion='css-img'] {
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  filter: none !important;
+  clip-path: none !important;
+}
+
+/* the shell's inner containers carry no height of their own (natively
+   they inherit from fb's fullscreen portal, which we replaced with the
+   fixed shell) - without this the whole viewer column collapsed to the
+   top and the stage area measured 0 tall. */
+body.tm-terminal-theme [data-tm-fb-lightbox] > div,
+body.tm-terminal-theme [data-tm-fb-lightbox] > div > div {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+/* the main image (fb marks it height/width="100%"; carousel thumbnails
+   aren't) natively sizes via an --x-paddingTop aspect box + absolute
+   fill, which computes to 0 tall inside our shell. bypass the machinery
+   the same way the reply-quote thumbnails do: kill the aspect box, put
+   the image back in flow, and let it size itself naturally (auto
+   width/height on a replaced element preserves aspect) capped to the
+   stage. thumbnails keep fb's own object-fit:cover crop. */
+body.tm-terminal-theme [data-tm-fb-lightbox] [style*='--x-paddingTop'] {
+  padding: 0 !important;
+  height: auto !important;
+  width: fit-content !important;
+}
+
+body.tm-terminal-theme [data-tm-fb-lightbox] [style*='--x-paddingTop'] > div {
+  position: static !important;
+  inset: auto !important;
+}
+
+body.tm-terminal-theme [data-tm-fb-lightbox] img[height='100%'],
+body.tm-terminal-theme [data-tm-fb-lightbox] video {
+  width: auto !important;
+  height: auto !important;
+  max-width: 92vw !important;
+  max-height: calc(100vh - 140px) !important;
+  object-fit: contain !important;
 }
 
 /* slot fb's live <video> gets reparented into. when empty it collapses;

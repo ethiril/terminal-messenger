@@ -62,7 +62,13 @@ function tagMessageDirections() {
 }
 
 function tagSmallLogImages() {
-  const candidateImages = document.querySelectorAll('[role="log"] img:not([data-tm-img-size])');
+  /* both scopes: current e2ee threads render without [role='log'], and an
+     untagged image never qualifies for the media viewer's click handler
+     (isClickableLogImage requires data-tm-img-size='large'). */
+  const candidateImages = document.querySelectorAll(
+    '[role="log"] img:not([data-tm-img-size]),'
+    + ' [data-tm-thread] img:not([data-tm-img-size])'
+  );
   for (const imageElement of candidateImages) {
     if (isInsideReactionContainer(imageElement)) {
       imageElement.setAttribute('data-tm-img-size', 'large');
@@ -386,10 +392,18 @@ function deriveActionKind(label) {
    excludes those since real action buttons carry icons, not text */
 function looksLikeIconOnlyAction(button) {
   if (isInsideReactionContainer(button)) return false;
+  /* fb wraps the reply-preview thumbnail in role=button ("Go to replied
+     message") - it's a content wrapper, never an action button, and tagging
+     it dragged the whole preview into toolbar styling */
+  if (button.closest('[data-tm-reply-quote]')) return false;
   const text = (button.textContent ?? '').trim();
   if (text.length > 2) return false;
-  const hasIcon = button.querySelector('svg, i[data-visualcompletion="css-img"], img');
-  return Boolean(hasIcon);
+  if (button.querySelector('svg, i[data-visualcompletion="css-img"]')) return true;
+  /* an <img> only counts as an icon when its alt is empty/emoji-sized.
+     content images and avatars carry a real alt ("Original image", the
+     sender's name) and mark the button as a content wrapper. */
+  const img = button.querySelector('img');
+  return Boolean(img) && (img.getAttribute('alt') ?? '').trim().length <= 2;
 }
 
 /* tag the wrapper only when at least one direct child is a tagged action
@@ -400,6 +414,15 @@ function looksLikeIconOnlyAction(button) {
    a short bounded walk for variants. previously this scanned every div in
    every row on every apply pass, which dominated CPU on large logs. */
 function tagActionToolbarWrappers() {
+  /* drop stale wrapper tags whose buttons have since been untagged (e.g.
+     the reply-preview wrapper after the content-image exclusion kicked in)
+     - unlike buttons, wrappers had no removal path and the tag lingered */
+  for (const stale of document.querySelectorAll('[data-tm-action-toolbar]')) {
+    if (!hasTaggedActionButtonChild(stale)) {
+      stale.removeAttribute('data-tm-action-toolbar');
+    }
+  }
+
   const taggedButtons = document.querySelectorAll(
     '[role="log"] [data-tm-action-button], [data-tm-thread] [data-tm-action-button]'
   );
@@ -575,7 +598,14 @@ function restructureMediaReply(quote) {
   parent.setAttribute('data-tm-media-reply', 'true');
 
   const direction = parent.closest('[data-tm-direction]')?.getAttribute('data-tm-direction') ?? 'in';
-  const setStyle = (element, property, value) => element.style.setProperty(property, value, 'important');
+  /* skip identical writes: the mutation observer now watches style
+     attributes (to catch fb wiping our inline layout), so an
+     unconditional setProperty every pass would re-trigger it forever. */
+  const setStyle = (element, property, value) => {
+    if (element.style.getPropertyValue(property) === value
+      && element.style.getPropertyPriority(property) === 'important') return;
+    element.style.setProperty(property, value, 'important');
+  };
 
   setStyle(parent, 'display', 'flex');
   setStyle(parent, 'flex-direction', 'column');
@@ -603,7 +633,10 @@ function restructureMediaReply(quote) {
       setStyle(child, 'display', 'none');
       continue;
     }
-    setStyle(child, 'position', 'static');
+    /* the response wrapper is the positioning anchor for the absolutely-
+       positioned Message-actions toolbar nested inside it (terminal.css) -
+       relative behaves identically to static for an un-offset flex child. */
+    setStyle(child, 'position', child === response ? 'relative' : 'static');
     setStyle(child, 'transform', 'none');
     setStyle(child, 'margin', '0');
     let order = '0';
@@ -622,6 +655,17 @@ function restructureMediaReply(quote) {
      offsets. */
   setStyle(response, 'height', 'auto');
   for (const node of response.querySelectorAll('*')) {
+    /* current fb builds nest the real Message-actions hover toolbar INSIDE
+       the response wrapper. flattening it pinned the React/Reply/More
+       buttons into the reply bubble's flow, where the bubble backing hid
+       them. leave its positioning to fb + the stylesheet (which anchors it
+       to the row edge), and strip the static pin a previous pass applied. */
+    if (node.closest('[role="toolbar"]')) {
+      if (node.style.getPropertyValue('position') === 'static') {
+        node.style.removeProperty('position');
+      }
+      continue;
+    }
     const computed = window.getComputedStyle(node);
     if (computed.position !== 'static') setStyle(node, 'position', 'static');
     if (computed.transform !== 'none') setStyle(node, 'transform', 'none');

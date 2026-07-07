@@ -379,3 +379,30 @@ function getActivePresenceStatus() {
   }
   return null;
 }
+
+/* fb's e2ee media viewer mounts INSIDE the app root - no dialog role, no
+   body-level portal - so it lands in none of the theme's imagery opt-in
+   scopes (every img inside it stays display:none) and ultra-mode layout
+   collapses its ancestor to a ~44px strip. identify it by its unique
+   chrome: a __fb-*-mode shell holding a Download link plus a Close
+   button, outside the log and outside proper dialogs (the group-chat
+   viewer is a real [role=dialog] and already works). tagging lets CSS
+   give it a fullscreen footprint and turn its media back on. */
+function tagFbMediaViewer() {
+  for (const stale of document.querySelectorAll('[data-tm-fb-lightbox]')) {
+    if (!stale.isConnected || !stale.querySelector('a[download]')) {
+      stale.removeAttribute('data-tm-fb-lightbox');
+    }
+  }
+
+  for (const link of document.querySelectorAll('a[download]')) {
+    const shell = link.closest('.__fb-dark-mode, .__fb-light-mode');
+    if (!shell) continue;
+    if (shell.hasAttribute('data-tm-fb-lightbox')) continue;
+    if (shell.closest('[role="log"], [data-tm-thread], [data-tm-chat-list]')) continue;
+    if (shell.closest('[role="dialog"], [aria-modal="true"]')) continue;
+    if (!shell.querySelector('img, video')) continue;
+    if (!shell.querySelector('[aria-label="Close" i]')) continue;
+    shell.setAttribute('data-tm-fb-lightbox', 'true');
+  }
+}
