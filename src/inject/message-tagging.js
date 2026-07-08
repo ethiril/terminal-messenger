@@ -175,6 +175,30 @@ const imageCollapseTogglesByImg = new WeakMap();
    and the wrapper, breaking nextElementSibling lookup). */
 const wrappersByToggle = new WeakMap();
 
+/* fb's reconciliation can empty or replace the wrapper a toggle was
+   inserted for (subtree re-render moves the img elsewhere; a fresh toggle
+   is then inserted at the new wrapper). the old toggle survives as an
+   orphan in a full-width parent and renders at the row's leading edge as
+   a duplicate "[-] image". a toggle is live only while its bound wrapper
+   still holds a large (or not-yet-sized) img or a video; anything else
+   gets removed, and so does any second toggle bound to the same wrapper. */
+function sweepStaleImageToggles() {
+  const seenWrappers = new Set();
+  for (const toggle of document.querySelectorAll('[data-tm-img-collapse-toggle]')) {
+    let wrapper = wrappersByToggle.get(toggle);
+    if (!wrapper || !wrapper.isConnected) wrapper = toggle.nextElementSibling;
+    const holdsMedia = Boolean(wrapper && wrapper.nodeType === Node.ELEMENT_NODE && (
+      wrapper.matches('img:not([data-tm-img-size="small"]), video')
+      || wrapper.querySelector('img:not([data-tm-img-size="small"]), video')
+    ));
+    if (!holdsMedia || seenWrappers.has(wrapper)) {
+      toggle.remove();
+      continue;
+    }
+    seenWrappers.add(wrapper);
+  }
+}
+
 /* insert a small terminal-style toggle immediately before each large chat
    image's wrapper so the user can collapse images (slot included) without
    losing the message context. idempotency: a WeakMap binds each <img> to
@@ -192,6 +216,8 @@ const wrappersByToggle = new WeakMap();
    is emitted. label reads "video" for video posters (the click promotes
    the underlying <video> into the viewer) and "image" otherwise. */
 function tagImageCollapseToggles() {
+  sweepStaleImageToggles();
+
   const candidateImages = document.querySelectorAll(
     '[role="log"] img[data-tm-img-size="large"],'
     + ' [data-tm-thread] img[data-tm-img-size="large"]'
@@ -228,6 +254,30 @@ function tagImageCollapseToggles() {
         wrapperGroups.delete(wrapper);
         break;
       }
+    }
+  }
+
+  /* same dedupe for the sibling-level variant: placeholder + real photo can
+     land in two non-nested wrappers occupying the same slot. two wrappers
+     whose rects overlap almost entirely are one logical image - keep the
+     larger. genuinely distinct images (albums, stacks) never overlap. */
+  const remaining = [...wrapperGroups.keys()].filter((wrapper) => wrapperGroups.has(wrapper));
+  for (const wrapper of remaining) {
+    if (!wrapperGroups.has(wrapper)) continue;
+    const rect = wrapper.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) continue; /* collapsed - leave alone */
+    for (const other of remaining) {
+      if (other === wrapper || !wrapperGroups.has(other) || !wrapperGroups.has(wrapper)) continue;
+      const otherRect = other.getBoundingClientRect();
+      if (otherRect.width === 0 || otherRect.height === 0) continue;
+      const overlapW = Math.min(rect.right, otherRect.right) - Math.max(rect.left, otherRect.left);
+      const overlapH = Math.min(rect.bottom, otherRect.bottom) - Math.max(rect.top, otherRect.top);
+      if (overlapW <= 0 || overlapH <= 0) continue;
+      const overlapArea = overlapW * overlapH;
+      const smallerArea = Math.min(rect.width * rect.height, otherRect.width * otherRect.height);
+      if (overlapArea < smallerArea * 0.8) continue;
+      const loser = rect.width * rect.height >= otherRect.width * otherRect.height ? other : wrapper;
+      wrapperGroups.delete(loser);
     }
   }
 
@@ -447,6 +497,51 @@ function hasTaggedActionButtonChild(wrapper) {
   return false;
 }
 
+/* fb wraps the quoted-original preview (text snippet, "Attachment" stub,
+   or media thumbnail) in a "Go to replied message" button - the one stable
+   anchor that distinguishes the quote from the user's new reply text. */
+const REPLY_PREVIEW_ANCHOR_SELECTOR = '[aria-label*="replied message" i]';
+
+/* a tagged quote is legitimate if it holds fb's replied-message anchor
+   (the preview) or reads as the short "X replied to Y" hint line. anything
+   else - most importantly the response wrapper holding the user's own
+   reply text - was tagged by a heuristic that fired before fb finished
+   rendering the preview, and must be released for re-tagging. */
+function isValidReplyQuote(element) {
+  /* the Message-actions toolbar lives only in the response cluster, and it
+     is mounted in the DOM permanently (zero-height until hover). a "quote"
+     holding one engulfed the user's own reply - anchor or not, release it
+     so the toolbar-guarded climb in findReplyPreviewQuote can re-tag just
+     the preview. */
+  if (element.querySelector('[role="toolbar"]')) return false;
+  if (element.querySelector(REPLY_PREVIEW_ANCHOR_SELECTOR)) return true;
+  const text = (element.textContent ?? '').trim();
+  return REPLY_HINT_PATTERN.test(text) && text.length <= 60;
+}
+
+/* locate the quoted-original preview among the hint wrapper's siblings via
+   fb's own anchor button. climbs from the anchor up to sibling level, but
+   never into a wrapper that also holds the Message-actions toolbar - that
+   wrapper is the response cluster and tagging it would dim the user's own
+   reply text. */
+function findReplyPreviewQuote(replyBlock) {
+  const parent = replyBlock.parentElement;
+  if (!parent) return null;
+  for (const sibling of parent.children) {
+    if (sibling === replyBlock) continue;
+    const anchor = sibling.querySelector(REPLY_PREVIEW_ANCHOR_SELECTOR);
+    if (!anchor) continue;
+    let scope = anchor;
+    while (scope.parentElement && scope.parentElement !== parent) {
+      const above = scope.parentElement;
+      if (above.querySelector('[role="toolbar"]')) break;
+      scope = above;
+    }
+    return scope;
+  }
+  return null;
+}
+
 /* idempotency check via "row already contains a tagged quote" rather than a
    scan flag: scan flags lock rows out of re-tagging when the row was first
    observed before fb finished rendering the hint text */
@@ -458,7 +553,28 @@ function tagReplyQuotes() {
     + '[data-tm-thread] [aria-roledescription="message"]'
   );
   for (const row of rows) {
-    const existingQuote = row.querySelector('[data-tm-reply-quote]');
+    let existingQuote = row.querySelector('[data-tm-reply-quote]');
+    const rowAnchor = row.querySelector(REPLY_PREVIEW_ANCHOR_SELECTOR);
+    if (existingQuote && rowAnchor) {
+      /* self-repair: an early pass can tag the response wrapper as the
+         quote (fb renders the preview text asynchronously; see the walk
+         below). once fb's replied-message anchor is present we can tell
+         quote from response - drop every mis-tag, then make sure the
+         actual preview carries the tag (releasing a mis-tag can leave
+         only the hint wrapper tagged, and the "row already has a quote"
+         check would otherwise lock the preview out forever). */
+      for (const quote of row.querySelectorAll('[data-tm-reply-quote]')) {
+        if (!isValidReplyQuote(quote)) quote.removeAttribute('data-tm-reply-quote');
+      }
+      const previewTagged = [...row.querySelectorAll('[data-tm-reply-quote]')]
+        .some((quote) => quote.contains(rowAnchor));
+      if (!previewTagged) {
+        const hintQuote = row.querySelector('[data-tm-reply-quote]');
+        const preview = hintQuote ? findReplyPreviewQuote(hintQuote) : null;
+        if (preview) preview.setAttribute('data-tm-reply-quote', 'true');
+      }
+      existingQuote = row.querySelector('[data-tm-reply-quote]');
+    }
     if (existingQuote) {
       /* re-run on every pass, not just at tag time: fb re-renders the
          response subtree in place, replacing the tagged elements. both
@@ -498,6 +614,18 @@ function tagReplyQuotes() {
     const hintText = (hintElement.textContent ?? '').trim();
     if (blockText.length > hintText.length + 4) continue;
 
+    /* preferred path: fb's own replied-message anchor marks the preview
+       unambiguously - no text/media heuristics needed. */
+    const preview = findReplyPreviewQuote(replyBlock);
+    if (preview) {
+      preview.setAttribute('data-tm-reply-quote', 'true');
+      if (preview.querySelector('img[data-tm-img-size="large"], video, picture')) {
+        restructureMediaReply(preview);
+      }
+      continue;
+    }
+
+    /* fallback for builds/moments without the anchor button. */
     let mediaQuote = null;
     let textQuote = null;
     let candidate = replyBlock.nextElementSibling;
@@ -515,11 +643,15 @@ function tagReplyQuotes() {
          (image quote has no text -> skipped -> response engulfed +
          dimmed alongside the user's actual reply). */
       const hasAvatar = candidate.querySelector('img[data-tm-img-size="small"]');
-      if (hasContentMedia && candidateText.length < 4) {
+      /* the Message-actions hover toolbar only ever lives in the response
+         cluster - a candidate carrying one is the user's new message, never
+         the quote, regardless of what the text heuristics say. */
+      const hasActionToolbar = candidate.querySelector('[role="toolbar"]');
+      if (hasContentMedia && !hasActionToolbar && candidateText.length < 4) {
         mediaQuote = candidate;
         break;
       }
-      if (!mediaQuote && looksLikeNewMessage && !textQuote && !hasAvatar) {
+      if (!mediaQuote && looksLikeNewMessage && !textQuote && !hasAvatar && !hasActionToolbar) {
         textQuote = candidate;
       }
       candidate = candidate.nextElementSibling;

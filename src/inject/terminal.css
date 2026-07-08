@@ -1279,6 +1279,22 @@ body.tm-terminal-theme.tm-terminal-theme [data-tm-reply-quote] {
   margin: 2px 0 !important;
   opacity: 0.55 !important;
   max-width: 100% !important;
+  /* fb can paint its replied-message backing card on the element we tag
+     as the quote itself - the descendant strip below never touches it,
+     leaving a grey slab behind the whole quote strip. */
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* outgoing replies right-align their text, but fb's inner wrappers hold
+   the quote box at full row width - so the leading-edge rail rendered
+   ~900px from the text, as a stranded tick mark next to the timestamp
+   gutter. mirror the rail to the trailing edge so it hugs the text the
+   way incoming quotes' rails do. */
+body.tm-terminal-theme.tm-terminal-theme [data-tm-direction='out'] [data-tm-reply-quote] {
+  border-inline-start: none !important;
+  border-inline-end: 2px solid var(--tm-muted) !important;
+  padding: 1px 8px 1px 0 !important;
 }
 
 /* image / video reply quotes: the preview is the thing being responded to,
@@ -1455,7 +1471,7 @@ body.tm-terminal-theme [data-tm-reply-quote] h3 svg {
    wrapper is the flex cell that used to hold fb's icon - same slot,
    same line as the text. */
 body.tm-terminal-theme [data-tm-reply-quote] h3 div:has(> svg)::before {
-  content: '\21B3';
+  content: '\21B3\00A0';
   color: var(--tm-muted);
   font-style: italic;
 }
