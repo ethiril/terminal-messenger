@@ -105,7 +105,10 @@ function confirmDebugEvalBridge(evalFilePath, parentWindow) {
       'inside your logged-in Messenger session. Results are written to ' +
       `${evalFilePath}.out and a screenshot of the window to ${evalFilePath}.png ` +
       'after every run.\n\n' +
-      'That is full read access to your open conversations, on disk, unencrypted. ' +
+      'Commands are not sandboxed and are not limited to reading. Anything you ' +
+      'could do in this window a command can do too, including typing in the ' +
+      'composer and sending messages as you. Results and screenshots are written ' +
+      'to disk unencrypted.\n\n' +
       'Only enable this if you set the variable yourself for development.\n\n' +
       'This choice is not remembered - quitting the app turns the bridge off again.'
   });

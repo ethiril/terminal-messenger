@@ -192,6 +192,7 @@ Notes:
 - **Each write must be self-contained.** The file is polled and each change runs as one independent command, so state doesn't carry between writes. Facebook also re-anchors its virtualised message list between commands, which means a selector resolved in one write may be stale by the next — resolve and use it in the same command.
 - **Consent is per launch and is not remembered.** Quitting the app turns the bridge off; the next launch asks again. There is no persisted opt-in by design.
 - **The artifacts contain your conversations.** `.out` dumps and `.png` screenshots are captures of a logged-in session, written unencrypted. `.tm-debug/` is gitignored for this reason — keep the path inside it.
+- **Commands are not sandboxed, and not restricted to reading.** A command has the same reach as the DevTools console on a logged-in tab: it can type into the composer and send messages as you. The injected helpers on `window.TerminalMessenger` make that a one-liner. Treat the watched file as something only you write to — a process that can write to it can act as you in Messenger.
 - Set no env var and the bridge does not exist: the poll timer is never created, so a normal build and a normal `npm start` carry none of this.
 
 ## Privacy and safety model
@@ -204,7 +205,7 @@ This is intentionally a visual wrapper. It avoids:
 - storing copies of conversations,
 - bypassing Facebook login or security flows.
 
-The one deliberate exception is the [debug eval bridge](#debug-eval-bridge), which does read the live DOM and write screenshots to disk. It is development tooling, off by default, and gated behind both an environment variable and an explicit dialog — but it is a real code path into a logged-in session, so it is called out here rather than buried.
+The one deliberate exception is the [debug eval bridge](#debug-eval-bridge). It is development tooling, off by default, and gated behind both an environment variable and an explicit dialog — but while enabled it runs unsandboxed JavaScript in a logged-in session, which is not bounded by the list above. A command written to the watched file can read conversations, drive the composer, and send messages. The bridge initiates none of that on its own, and nothing runs unless a human writes it — but the restraint is the operator's, not the code's, so it is called out here rather than buried.
 
 Any CSS/DOM selectors that affect Facebook's interface may break when Facebook changes the web app.
 
