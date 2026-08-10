@@ -1,8 +1,9 @@
 const { app, BrowserWindow, ipcMain, session } = require('electron');
-const { loadAppConfig } = require('./shell/app-config');
+const { loadAppConfig, isAllowedMessengerUrl } = require('./shell/app-config');
 const { buildApplicationMenu } = require('./shell/application-menu');
 const { createMessengerWindow } = require('./shell/messenger-window');
 const { loadStoredSettings, saveStoredSettings } = require('./shell/settings-store');
+const { bindWebContentsGuards } = require('./shell/web-contents-guards');
 
 const SESSION_PARTITION = 'persist:terminal-messenger';
 const SAFE_PERMISSIONS = ['notifications', 'clipboard-read', 'clipboard-sanitized-write'];
@@ -14,7 +15,16 @@ let storedSettings = {};
 
 function configurePersistentSession() {
   const persistentSession = session.fromPartition(SESSION_PARTITION);
-  persistentSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+  persistentSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    /* mic/camera is granted only to pages actually served from an allowed
+       messenger host - without it every call prompt was auto-denied and
+       Messenger calls just silently failed. scoping by URL keeps any other
+       document that ends up in this session (an oauth hop, an embedded
+       frame) from inheriting the grant. */
+    if (permission === 'media') {
+      callback(isAllowedMessengerUrl(webContents.getURL(), appConfig.allowedHosts));
+      return;
+    }
     callback(SAFE_PERMISSIONS.includes(permission));
   });
 }
@@ -49,6 +59,15 @@ function registerIpcHandlers() {
     const nextMuted = !targetWindow.webContents.isAudioMuted();
     targetWindow.webContents.setAudioMuted(nextMuted);
     return nextMuted;
+  });
+
+  /* synchronous on purpose: preload needs the live values before first paint,
+     and the argv snapshot it would otherwise use is frozen at window-creation
+     time - so any in-session reload (the hourly refresh, cmd-R) reverted
+     theme/density/font to whatever they were at launch. the payload is a
+     handful of scalars. */
+  ipcMain.on('tm:get-settings', (event) => {
+    event.returnValue = storedSettings;
   });
 
   ipcMain.handle('tm:save-settings', (_event, partial) => {
@@ -95,6 +114,12 @@ app.whenReady().then(() => {
   buildApplicationMenu(appConfig);
   configurePersistentSession();
   registerIpcHandlers();
+  /* must be registered before the first window is created - popups opened by
+     fb (calls, oauth dialogs) previously got no nav guards, no context menu
+     and no shortcut pipeline at all. */
+  app.on('web-contents-created', (_event, webContents) => {
+    bindWebContentsGuards(webContents, appConfig);
+  });
   const messengerWindow = createMessengerWindow(appConfig, SESSION_PARTITION, storedSettings);
   setupDebugEvalBridge(messengerWindow);
 

@@ -1,5 +1,9 @@
 const path = require('node:path');
+/* optional-chained at every use: scripts/check-bundle.js requires this module
+   outside Electron, where `app` is undefined. */
+const { app } = require('electron');
 const { readTextFileOrNull, isAllowedMessengerUrl } = require('./app-config');
+const { SETTINGS_SCHEMA } = require('./settings-schema');
 
 const TERMINAL_INJECT_DIRECTORY = path.join(__dirname, '..', 'inject');
 const TERMINAL_CSS_PATH = path.join(TERMINAL_INJECT_DIRECTORY, 'terminal.css');
@@ -21,16 +25,36 @@ const INJECT_SCRIPT_FILES = [
   'terminal.js'
 ].map((fileName) => path.join(TERMINAL_INJECT_DIRECTORY, fileName));
 
-function buildInjectionScript(appConfig) {
+/* reading 14 files off disk on every SPA navigation is pure overhead in a
+   packaged build, where the sources can't change under us. in development we
+   keep re-reading so editing an inject module and hitting reload still picks
+   the change up without restarting Electron. */
+let cachedModuleSources = null;
+
+function readInjectModuleSources() {
+  if (cachedModuleSources) return cachedModuleSources;
   const moduleSources = INJECT_SCRIPT_FILES.map(readTextFileOrNull);
   if (moduleSources.some((source) => source === null)) return null;
+  if (app?.isPackaged) cachedModuleSources = moduleSources;
+  return moduleSources;
+}
+
+function buildInjectionScript(appConfig) {
+  const moduleSources = readInjectModuleSources();
+  if (moduleSources === null) return null;
 
   const userPreferences = JSON.stringify({
     theme: appConfig.theme
   });
+  /* the inject modules can't require() shell/settings-schema.js, so hand them
+     the same constants main and preload use through a prelude written ahead
+     of the bundle. */
+  const settingsSchema = JSON.stringify(SETTINGS_SCHEMA);
 
   const concatenatedModules = moduleSources.join('\n\n');
-  return `window.__TERMINAL_MESSENGER_CONFIG__ = ${userPreferences};\n(() => {\n${concatenatedModules}\n})();`;
+  return `window.__TERMINAL_MESSENGER_CONFIG__ = ${userPreferences};\n`
+    + `window.__TERMINAL_MESSENGER_SCHEMA__ = ${settingsSchema};\n`
+    + `(() => {\n${concatenatedModules}\n})();`;
 }
 
 /* insertCSS appends a fresh copy of the stylesheet on every call and
@@ -56,9 +80,24 @@ function injectTerminalLayer(targetWindow, appConfig) {
   return nextRun;
 }
 
+/* on an SPA thread switch the bundle's first statement just re-applies and
+   returns, so shipping ~180KB of source over the IPC boundary to get there is
+   wasted work. ask the renderer to do that re-apply directly; only build and
+   send the bundle when it reports itself detached. */
+const REATTACH_PROBE = 'window.TerminalMessenger?.attached '
+  + '? (window.TerminalMessenger.apply(), true) : false';
+
 async function performInjection(targetWindow, appConfig) {
   if (targetWindow.isDestroyed()) return false;
   if (!isAllowedMessengerUrl(targetWindow.webContents.getURL(), appConfig.allowedHosts)) return false;
+
+  try {
+    const alreadyAttached = await targetWindow.webContents.executeJavaScript(REATTACH_PROBE, true);
+    if (alreadyAttached === true) return true;
+  } catch {
+    /* probe failed (page mid-navigation, JS blocked) - fall through and do
+       the full injection, which is the behaviour we had before the probe. */
+  }
 
   const injectionScript = buildInjectionScript(appConfig);
   if (injectionScript === null) return false;
@@ -83,4 +122,7 @@ async function performInjection(targetWindow, appConfig) {
   }
 }
 
-module.exports = { injectTerminalLayer };
+/* buildInjectionScript is exported for scripts/check-bundle.js: inject/terminal.js
+   is only legal inside the IIFE assembled here (it uses top-level `return`), so
+   per-file `node --check` can't validate it. */
+module.exports = { injectTerminalLayer, buildInjectionScript };

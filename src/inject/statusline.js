@@ -1,6 +1,18 @@
 const STATUSLINE_ELEMENT_ID = 'tm-statusline';
 const STATUSLINE_CLOCK_INTERVAL_MS = 1000;
 
+/* the hint strip advertises the real shortcuts, so it has to name the real
+   modifiers: the Cmd/Shift glyphs read as nonsense on win/linux, where the
+   primary modifier is Ctrl. matches the accelerators in
+   shell/application-menu.js and shell/web-contents-guards.js. */
+function buildStatuslineHint() {
+  const isMac = /Mac|iPhone|iPad/i.test(navigator.platform ?? '');
+  const chord = isMac ? '\u2318\u21e7' : 'Ctrl+Shift+';
+  const sep = ' \u00b7 ';
+  return ['/help', `${chord}S search`, `${chord}P`, `${chord}T`,
+    `${chord}U`, `${chord}M`, `${chord}Y vanilla`].join(sep);
+}
+
 function ensureStatuslineElement() {
   const existing = document.getElementById(STATUSLINE_ELEMENT_ID);
   if (existing) return existing;
@@ -21,7 +33,7 @@ function ensureStatuslineElement() {
       <span class="tm-prompt-path">~/messenger</span>
       <span class="tm-prompt-presence"></span>
     </span>
-    <span class="tm-prompt-hint">/help · ⌘⇧S search · ⌘⇧P · ⌘⇧T · ⌘⇧U · ⌘⇧M · ⌘⇧Y vanilla</span>
+    <span class="tm-prompt-hint">${buildStatuslineHint()}</span>
     <span class="tm-prompt-spacer"></span>
     <span class="tm-prompt-segment tm-prompt-segment-right">
       <span class="tm-prompt-net"></span>

@@ -12,8 +12,9 @@ It does **not** use private Messenger APIs, scrape messages, or implement its ow
 - Adds a command palette and a few local shortcuts.
 - Adds a top statusline with thread name, presence, flags, and clock.
 - Provides an **ultra** mode (chat-only fullscreen) and a **vanilla** mode (revert to native Messenger).
-- Reloads the renderer every 30 minutes while the window is unfocused, to free memory.
-- Opens non-Facebook links in your normal browser.
+- Reloads the renderer roughly hourly while the window is unfocused and idle (no draft in the composer, no audio/video playing), to free memory.
+- Opens non-Facebook links in your normal browser, including links Facebook wraps through its `l.facebook.com` redirector.
+- Supports Messenger voice/video calls: mic and camera are granted only to pages served from an allowed host.
 
 ## Run from source
 
@@ -90,10 +91,27 @@ Expect `kMDItemKind = "Application"`.
 | `Cmd+Shift+M` | Mute / unmute window audio |
 | `Cmd+Shift+I` | DevTools |
 | `Cmd+R` | Reload |
-| `Alt+Left` / `Alt+Right` | Browser-style back / forward |
+| `Cmd+Shift+H` | Back to the messages home page |
+| `Cmd+[` / `Cmd+]` | Browser-style back / forward (macOS) |
+| `Alt+Left` / `Alt+Right` | Browser-style back / forward (Windows / Linux) |
 | `/` while not typing | Open command palette |
 
 (Substitute `Ctrl` for `Cmd` on non-macOS.)
+
+On macOS, history navigation deliberately uses `Cmd+[` / `Cmd+]` rather than
+`Alt+Arrow`, which belongs to the composer's word-by-word cursor movement.
+
+### Vim-style keys
+
+Active when you are not typing in a text field:
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Move the chat-list cursor down / up |
+| `Enter` | Open the cursored chat |
+| `G` | Jump to the newest message in the open chat |
+| `gg` | Jump to the oldest loaded message |
+| `n` / `N` | Step forward / back through the last in-thread search matches |
 
 All settings — theme, ultra, vanilla, opacity, mute, density, font size — persist across reloads via a JSON file in the app's user-data directory (mirrored to `localStorage` for fast early paint).
 
@@ -130,12 +148,15 @@ Edit `config/app.json`:
 ```json
 {
   "homeUrl": "https://www.facebook.com/messages",
+  "allowedHosts": ["facebook.com", "messenger.com"],
   "theme": "green",
   "window": { "width": 1280, "height": 860 }
 }
 ```
 
 You can swap `homeUrl` to `https://www.messenger.com/` if that works better in your region/session.
+
+`allowedHosts` is the navigation allowlist: subdomains are matched too, and anything outside it opens in your normal browser instead of inside the app window.
 
 ## Modes
 
@@ -159,7 +180,7 @@ Any CSS/DOM selectors that affect Facebook's interface may break when Facebook c
 
 - Facebook uses generated class names and frequently changes markup, so the theme is best-effort. Some areas may remain partially unstyled, and commands like `:focus search` or `:unread` use heuristic selectors.
 - The build is unsigned; macOS Gatekeeper will challenge the first launch unless you clear the quarantine attribute.
-- Memory grows over long sessions because of Facebook's React tree and message backbuffer; the 30-minute background reload partially mitigates this.
+- Memory grows over long sessions because of Facebook's React tree and message backbuffer; the hourly background reload partially mitigates this. The reload is skipped while the window is focused, while a draft is in the composer, or while audio/video is playing, so it can be delayed well past the hour mark.
 
 ## Troubleshooting
 

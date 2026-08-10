@@ -196,6 +196,35 @@ function tagComposerPlaceholder() {
    aren't matched), then climb to the largest wrapper that does NOT
    contain the composer input - that's the preview's branch. CSS rules
    keyed off the tag re-flow the preview ABOVE the textbox in both modes. */
+const REPLY_PREVIEW_TEXT_SCAN_INTERVAL_MS = 1000;
+let lastReplyPreviewTextScanAt = 0;
+
+function replyPreviewTextScanIsDue() {
+  const now = performance.now();
+  if (now - lastReplyPreviewTextScanAt < REPLY_PREVIEW_TEXT_SCAN_INTERVAL_MS) return false;
+  lastReplyPreviewTextScanAt = now;
+  return true;
+}
+
+/* fallback for builds that don't expose the "Cancel reply" aria-label: scan
+   for the "Replying to <name>" header. skips nodes that engulf or are inside
+   the composer input, and anything inside the message log (those are
+   already-sent reply quotes, handled by tagReplyQuotes). */
+function findReplyPreviewAnchorByText(mainElement, composerInput) {
+  for (const candidate of mainElement.querySelectorAll('div, span, section, aside, h3, h4, p')) {
+    if (candidate === composerInput) continue;
+    if (candidate.contains(composerInput)) continue;
+    if (composerInput.contains(candidate)) continue;
+    if (candidate.closest('[role="log"], [data-tm-thread]')) continue;
+    const directText = collectDirectText(candidate);
+    if (!directText) continue;
+    if (directText.length > 80) continue;
+    if (!/\breplying to\b/i.test(directText)) continue;
+    return candidate;
+  }
+  return null;
+}
+
 function tagComposerReplyPreview() {
   const composerInput = findFirstMatchingElement(COMPOSER_INPUT_SELECTORS);
   if (!composerInput) {
@@ -213,22 +242,20 @@ function tagComposerReplyPreview() {
   let anchor = mainElement.querySelector('[aria-label="Cancel reply" i]');
 
   if (!anchor) {
-    /* fallback: text scan for the "Replying to <name>" header. skip
-       nodes that engulf or are inside the composer input, and skip
-       anything inside the message log (those are already-sent reply
-       quotes, a different feature handled by tagReplyQuotes). */
-    for (const candidate of mainElement.querySelectorAll('div, span, section, aside, h3, h4, p')) {
-      if (candidate === composerInput) continue;
-      if (candidate.contains(composerInput)) continue;
-      if (composerInput.contains(candidate)) continue;
-      if (candidate.closest('[role="log"], [data-tm-thread]')) continue;
-      const directText = collectDirectText(candidate);
-      if (!directText) continue;
-      if (directText.length > 80) continue;
-      if (!/\breplying to\b/i.test(directText)) continue;
-      anchor = candidate;
-      break;
+    /* the text-scan fallback walks every div/span/section/aside/h3/h4/p under
+       [role=main] and reads each one's direct text. with no reply active -
+       the overwhelmingly common state - the Cancel anchor is absent, so every
+       apply pass (up to 10/s) paid for that whole walk to find nothing. */
+    if (!replyPreviewTextScanIsDue()) {
+      /* between scans, keep whatever the last one tagged: clearing here would
+         flicker the preview off and on once a second on builds that don't
+         expose the aria anchor. */
+      if (document.querySelector('[data-tm-composer-reply-preview]')) {
+        updateReplyPreviewBottom(composerInput);
+      }
+      return;
     }
+    anchor = findReplyPreviewAnchorByText(mainElement, composerInput);
   }
 
   if (!anchor) {
@@ -281,14 +308,21 @@ function updateReplyPreviewBottom(composerInput) {
 }
 
 /* mark chat-list rows that look unread so the :filter command can hide
-   everything else. fb encodes unread in several places:
-   - aria-label includes "unread"
-   - row contains a text/numeric badge whose accessible name carries
-     "unread"
-   - row's preview text is rendered in bold (heuristic: an inner span
-     with font-weight >= 600 via inline style)
-   re-evaluated every apply pass because fb mutates rows in place when
-   they go from read→unread without unmounting them. */
+   everything else. re-evaluated every apply pass because fb mutates rows in
+   place when they go from read→unread without unmounting them.
+
+   KNOWN BROKEN on the current fb build (measured live 2026-08-10):
+   - chat rows carry no aria-label at all (0 of 23 rows), and only 5 of 20
+     inner [role=link]s carry one - none of those mention "unread". the only
+     "unread" accessible name in the whole document belongs to the
+     Notifications bell, outside the chat list.
+   - the bold-preview fallback an earlier version of this comment promised
+     cannot work while the terminal skin is on: terminal.css normalises every
+     chat-row span to font-weight 400 and color var(--tm-text), so
+     getComputedStyle reports weight 400 on read and unread rows alike.
+   so `:filter unread`, `:unread` and the unread count under-report to zero.
+   fixing this needs a signal our own stylesheet doesn't overwrite - do NOT
+   re-add a computed-font-weight heuristic without re-measuring first. */
 function tagChatListUnread() {
   const chatLists = document.querySelectorAll('[data-tm-chat-list]');
   for (const chatList of chatLists) {

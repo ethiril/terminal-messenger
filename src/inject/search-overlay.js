@@ -189,7 +189,11 @@ function buildResultRow(result, index, lowercaseQuery) {
       lastMessageMatchCursor = lastMessageMatches.indexOf(result.target);
       showToast(`jumped: ${result.label.slice(0, SEARCH_TOAST_TRIM)}`);
     } else {
-      result.target.click();
+      /* SEARCHABLE_ROW_SELECTOR yields document order, so the row we kept is
+         the OUTER one - and outer chat rows sometimes swallow the click
+         without navigating (see openChatListCursorTarget). prefer the inner
+         link, which always navigates. */
+      (result.target.querySelector('a[role="link"], [role="link"]') ?? result.target).click();
       showToast(`opened: ${result.label.slice(0, SEARCH_TOAST_TRIM)}`);
     }
     closeSearchOverlay();

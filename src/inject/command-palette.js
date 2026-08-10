@@ -227,9 +227,14 @@ function ensurePaletteElement() {
       /* if suggestions visible, navigate them first - keeps the up
          arrow predictable when the user is browsing completions
          rather than recalling history. history takes over once the
-         suggestion list is empty / dismissed. */
+         suggestion list is empty / dismissed.
+         exception: on a freshly-opened palette the input is empty and the
+         FULL command list is showing, so this branch always won and
+         shell-style "up = previous command" could never fire. an empty
+         input the user hasn't arrowed into means they want history. */
       const list = suggestionsElement.querySelectorAll('.tm-command-suggestion');
-      if (list.length > 1) {
+      const wantsHistory = inputElement.value.trim() === '' && !suggestionNavigated;
+      if (list.length > 1 && !wantsHistory) {
         suggestionCursor = Math.max(0, suggestionCursor - 1);
         suggestionNavigated = true;
         highlightSuggestion(suggestionsElement);
@@ -536,12 +541,15 @@ function runOpacityCommand(commandArgs) {
   return `opacity=${appliedPct}%`;
 }
 
-function runToggleableCommand(commandArgs, settingName, applySetting) {
+/* commandName defaults to settingName but must be passed whenever the two
+   differ (`:mute` sets `muted`, `:sent-color` sets `sentColor`) - otherwise
+   the usage/echo lines leak internal setting keys the user can't type. */
+function runToggleableCommand(commandArgs, settingName, applySetting, commandName = settingName) {
   const flag = parseTriStateFlag(commandArgs[0]);
-  if (flag === null) return `usage: :${settingName} [on|off]`;
+  if (flag === null) return `usage: :${commandName} [on|off]`;
   if (flag === 'toggle') applySetting(!settings[settingName]);
   else applySetting(flag === 'on');
-  return `${settingName}=${settings[settingName]}`;
+  return `${commandName}=${settings[settingName]}`;
 }
 
 function runFocusCommand(commandArgs) {
@@ -583,20 +591,23 @@ function runCommand(rawInput) {
       return `mode=${settings.themeDisabled ? 'vanilla' : 'terminal'}`;
     }
     case 'opacity':       return runOpacityCommand(commandArgs);
-    case 'mute':          return runToggleableCommand(commandArgs, 'muted', setMuted);
+    case 'mute':          return runToggleableCommand(commandArgs, 'muted', setMuted, 'mute');
     case 'density':       return runDensityCommand(commandArgs);
     case 'fontsize':      return runFontSizeCommand(commandArgs);
-    case 'sent-color':    return runToggleableCommand(commandArgs, 'sentColor', setSentColor);
-    case 'bottom':        return scrollLogToBottom() ? '' : 'no log';
-    case 'top':           return scrollLogToTop() ? '' : 'no log';
+    case 'sent-color':    return runToggleableCommand(commandArgs, 'sentColor', setSentColor, 'sent-color');
+    case 'bottom':        return scrollLogToBottom() ? 'scrolled=bottom' : 'no log';
+    case 'top':           return scrollLogToTop() ? 'scrolled=top' : 'no log';
     case 'filter': {
       if (!commandArgs[0]) return `filter=${settings.chatListFilter} (usage: :filter all|unread)`;
       if (!VALID_CHAT_FILTERS.includes(commandArgs[0])) return 'usage: :filter all|unread';
       return `filter=${setChatListFilter(commandArgs[0])}`;
     }
-    case 'pin':           return pinCursoredChat() ? '' : '';
-    case 'mark-unread':   return markCursoredChatUnread() ? '' : '';
-    case 'mute-chat':     return muteCursoredChat() ? '' : '';
+    /* these three report their own outcome via toast (the action is async -
+       fb's overflow menu has to mount first), so there's nothing useful to
+       echo back into the palette. */
+    case 'pin':           pinCursoredChat();          return '';
+    case 'mark-unread':   markCursoredChatUnread();   return '';
+    case 'mute-chat':     muteCursoredChat();         return '';
     case 'goto': {
       const targetName = commandArgs.join(' ');
       return gotoChatByName(targetName) ? `opened: ${targetName}` : `no chat matching "${targetName}"`;
@@ -608,6 +619,9 @@ function runCommand(rawInput) {
     case 'focus':         return runFocusCommand(commandArgs);
     case 'unread':        return openFirstUnreadThread() ? 'opened≈unread' : 'no unread item detected';
     case 'notifications':
+      /* close the palette first, as :search does - otherwise the two panels
+         stack and one Escape leaves the user in the layer underneath. */
+      closePalette();
       openNotificationsOverlay();
       return '';
     case 'reload':

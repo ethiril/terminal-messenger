@@ -68,6 +68,9 @@ function ensureNotificationsOverlay() {
     if (!root.classList.contains('tm-notifications-open')) return;
     closeNotificationsOverlay();
     event.preventDefault();
+    /* capture-phase handler: without this, the same Escape kept travelling
+       and closed the palette underneath as well - one Escape, one layer. */
+    event.stopPropagation();
   }, true);
 
   return root;

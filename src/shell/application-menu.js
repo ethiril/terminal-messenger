@@ -44,15 +44,46 @@ function pasteIntoFocusedWindow(focusedWindow) {
   focusedWindow.webContents.insertText(clipboardText);
 }
 
+const IS_MAC = process.platform === 'darwin';
+
+/* on darwin, Option+Left/Right is the system-wide word-jump the user expects
+   while typing in the composer - claiming it for history navigation broke
+   text editing app-wide. use the platform-native Cmd+[ / Cmd+] there and keep
+   Alt+Arrow on win/linux where it IS the platform convention.
+   mirrored in web-contents-guards.js shortcutHandlerFor - update both. */
+const HISTORY_BACK_ACCELERATOR = IS_MAC ? 'Cmd+[' : 'Alt+Left';
+const HISTORY_FORWARD_ACCELERATOR = IS_MAC ? 'Cmd+]' : 'Alt+Right';
+
+/* the macOS app-menu roles below don't exist on other platforms, where they
+   would render as dead entries. */
+function buildAppMenuSubmenu() {
+  if (!IS_MAC) {
+    return [
+      { role: 'about' },
+      { type: 'separator' },
+      { role: 'quit' }
+    ];
+  }
+  return [
+    { role: 'about' },
+    { type: 'separator' },
+    { role: 'services' },
+    { type: 'separator' },
+    { role: 'hide' },
+    { role: 'hideOthers' },
+    { role: 'unhide' },
+    { type: 'separator' },
+    { role: 'quit' }
+  ];
+}
+
 function buildApplicationMenu(appConfig) {
   const menuTemplate = [
     {
       label: 'Terminal Messenger',
-      submenu: [
-        { role: 'about' },
-        { type: 'separator' },
-        { role: 'quit' }
-      ]
+      /* `hide` restores Cmd+H to its macOS-universal meaning; Home moved to
+         Shift+Cmd+H, which it had been shadowing. */
+      submenu: buildAppMenuSubmenu()
     },
     {
       label: 'Edit',
@@ -82,22 +113,22 @@ function buildApplicationMenu(appConfig) {
         {
           label: 'Command Palette',
           accelerator: 'CmdOrCtrl+Shift+P',
-          click: (_menuItem, focusedWindow) => runRendererAction(focusedWindow, 'openPalette')
+          click: (_menuItem, focusedWindow) => runRendererAction(focusedWindow?.webContents, 'openPalette')
         },
         {
           label: 'Toggle Theme',
           accelerator: 'CmdOrCtrl+Shift+T',
-          click: (_menuItem, focusedWindow) => runRendererAction(focusedWindow, 'toggleTheme')
+          click: (_menuItem, focusedWindow) => runRendererAction(focusedWindow?.webContents, 'toggleTheme')
         },
         {
           label: 'Toggle Ultra Terminal Mode',
           accelerator: 'CmdOrCtrl+Shift+U',
-          click: (_menuItem, focusedWindow) => runRendererAction(focusedWindow, 'toggleUltra')
+          click: (_menuItem, focusedWindow) => runRendererAction(focusedWindow?.webContents, 'toggleUltra')
         },
         {
           label: 'Search Chats',
           accelerator: 'CmdOrCtrl+Shift+S',
-          click: (_menuItem, focusedWindow) => runRendererAction(focusedWindow, 'openSearchOverlay')
+          click: (_menuItem, focusedWindow) => runRendererAction(focusedWindow?.webContents, 'openSearchOverlay')
         },
         { type: 'separator' },
         { role: 'reload' },
@@ -115,21 +146,24 @@ function buildApplicationMenu(appConfig) {
       submenu: [
         {
           label: 'Home',
-          accelerator: 'CmdOrCtrl+H',
+          accelerator: 'CmdOrCtrl+Shift+H',
           click: (_menuItem, focusedWindow) => focusedWindow?.loadURL(appConfig.homeUrl)
         },
         {
           label: 'Back',
-          accelerator: 'Alt+Left',
+          accelerator: HISTORY_BACK_ACCELERATOR,
           click: (_menuItem, focusedWindow) => focusedWindow?.webContents.goBack()
         },
         {
           label: 'Forward',
-          accelerator: 'Alt+Right',
+          accelerator: HISTORY_FORWARD_ACCELERATOR,
           click: (_menuItem, focusedWindow) => focusedWindow?.webContents.goForward()
         }
       ]
-    }
+    },
+    /* restores Cmd+W (close), Cmd+M (minimize), zoom and window cycling -
+       without this menu those keys did nothing at all. */
+    { role: 'windowMenu' }
   ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));

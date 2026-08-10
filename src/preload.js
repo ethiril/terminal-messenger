@@ -3,47 +3,57 @@ const { contextBridge, ipcRenderer } = require('electron');
 const STORAGE_KEY_THEME = 'terminalMessenger.theme';
 const STORAGE_KEY_OPACITY = 'terminalMessenger.opacity';
 const STORAGE_KEY_MUTED = 'terminalMessenger.muted';
-/* keep in sync with shell/settings-store.js VALID_THEMES and
-   inject/settings.js VALID_THEMES. preload runs in a sandboxed renderer
-   and can't require() arbitrary local modules, so this list is duplicated
-   on purpose. */
-const VALID_THEMES = ['green', 'amber', 'cyan', 'mono', 'mocha', 'twilight', 'neon', 'macchiato', 'frappe', 'latte'];
-const STORED_SETTINGS_FLAG = '--tm-stored-settings=';
 
-const EARLY_THEME_PALETTES = {
-  green: { background: '#050805', foreground: '#c8e8c0' },
-  amber: { background: '#0a0700', foreground: '#f5d99a' },
-  cyan: { background: '#02080d', foreground: '#c0e8f5' },
-  mono: { background: '#080808', foreground: '#d8d8d8' },
-  mocha: { background: '#1e1e2e', foreground: '#cdd6f4' },
-  twilight: { background: '#1c1f2e', foreground: '#dfcef5' },
-  neon: { background: '#0a0518', foreground: '#d4c8ff' },
-  macchiato: { background: '#24273a', foreground: '#cad3f5' },
-  frappe: { background: '#303446', foreground: '#c6d0f5' },
-  latte: { background: '#eff1f5', foreground: '#4c4f69' }
+const STORED_SETTINGS_FLAG = '--tm-stored-settings=';
+const SETTINGS_SCHEMA_FLAG = '--tm-settings-schema=';
+
+/* only used if the schema payload from main is missing or unparseable -
+   shell/settings-schema.js is the real source (it derives the palette from
+   terminal.css). green alone keeps early paint sane in that degraded case. */
+const FALLBACK_SETTINGS_SCHEMA = {
+  themes: ['green'],
+  defaultTheme: 'green',
+  themePalettes: { green: { background: '#050805', foreground: '#c8e8c0' } },
+  minOpacityPct: 20,
+  maxOpacityPct: 100
 };
 
 const EARLY_STYLE_ELEMENT_ID = 'tm-early-style';
 const EARLY_REVEAL_FALLBACK_MS = 4000;
 
-/* settings handed in from main via additionalArguments — survive even if
-   Electron's localStorage gets purged (logout, partition reset, etc).
-   the sandboxed preload has DOM atob() but not Node's Buffer, so decode
-   the base64 wrapper through atob. settings keys are ASCII-safe. */
-function readStoredSettingsFromArgs() {
-  const flag = process.argv.find((arg) => arg.startsWith(STORED_SETTINGS_FLAG));
-  if (!flag) return {};
+/* payloads handed in from main via additionalArguments. the sandboxed preload
+   has DOM atob() but not Node's Buffer, so decode the base64 wrapper through
+   atob; both payloads are ASCII-safe JSON. */
+function readEncodedArgPayload(flagPrefix) {
+  const flag = process.argv.find((arg) => arg.startsWith(flagPrefix));
+  if (!flag) return null;
   try {
-    const encoded = flag.slice(STORED_SETTINGS_FLAG.length);
-    const decoded = atob(encoded);
-    const parsed = JSON.parse(decoded);
-    return parsed && typeof parsed === 'object' ? parsed : {};
+    const parsed = JSON.parse(atob(flag.slice(flagPrefix.length)));
+    return parsed && typeof parsed === 'object' ? parsed : null;
   } catch {
-    return {};
+    return null;
   }
 }
 
-const storedSettings = readStoredSettingsFromArgs();
+const settingsSchema = readEncodedArgPayload(SETTINGS_SCHEMA_FLAG) ?? FALLBACK_SETTINGS_SCHEMA;
+const VALID_THEMES = settingsSchema.themes;
+const EARLY_THEME_PALETTES = settingsSchema.themePalettes;
+
+/* the argv snapshot is encoded once, at window creation, so it goes stale the
+   moment the user changes a setting - and an in-session reload (hourly
+   refresh, cmd-R) re-runs this preload against that stale copy, reverting
+   theme/density/font to their launch-time values. ask main for the live
+   settings instead, keeping argv as the fallback. sendSync is acceptable
+   here: preload blocks before first paint anyway and the payload is tiny. */
+function readLiveStoredSettings() {
+  try {
+    const live = ipcRenderer.sendSync('tm:get-settings');
+    if (live && typeof live === 'object') return live;
+  } catch {}
+  return readEncodedArgPayload(STORED_SETTINGS_FLAG) ?? {};
+}
+
+const storedSettings = readLiveStoredSettings();
 
 /* fb installs paste/copy/cut blockers on the composer that call
    preventDefault, killing the browser's default clipboard behavior.
@@ -94,16 +104,19 @@ function readSavedTheme() {
   }
 }
 
+function isUsableOpacityPct(candidate) {
+  return Number.isFinite(candidate)
+    && candidate >= settingsSchema.minOpacityPct
+    && candidate <= settingsSchema.maxOpacityPct;
+}
+
 function readSavedOpacityPct() {
-  if (Number.isFinite(storedSettings.opacityPct)
-      && storedSettings.opacityPct >= 20 && storedSettings.opacityPct <= 100) {
-    return storedSettings.opacityPct;
-  }
+  if (isUsableOpacityPct(storedSettings.opacityPct)) return storedSettings.opacityPct;
   try {
     const stored = parseInt(localStorage.getItem(STORAGE_KEY_OPACITY) ?? '', 10);
-    if (Number.isFinite(stored) && stored >= 20 && stored <= 100) return stored;
+    if (isUsableOpacityPct(stored)) return stored;
   } catch {}
-  return 100;
+  return settingsSchema.maxOpacityPct;
 }
 
 function readSavedMuted() {
@@ -124,7 +137,9 @@ function applyEarlyThemeClass(activeTheme, themeDisabled) {
 }
 
 function buildEarlyStyleElement(activeTheme) {
-  const palette = EARLY_THEME_PALETTES[activeTheme];
+  const palette = EARLY_THEME_PALETTES[activeTheme]
+    ?? EARLY_THEME_PALETTES[settingsSchema.defaultTheme]
+    ?? FALLBACK_SETTINGS_SCHEMA.themePalettes.green;
   const styleElement = document.createElement('style');
   styleElement.id = EARLY_STYLE_ELEMENT_ID;
   styleElement.textContent = `
@@ -167,11 +182,12 @@ contextBridge.exposeInMainWorld('terminalMessengerBridge', {
   toggleWindowMuted: () => ipcRenderer.invoke('tm:toggle-muted'),
   /* clone so renderer-side mutations can't mutate this preload's copy */
   savedSettings: JSON.parse(JSON.stringify(storedSettings)),
+  settingsSchema: JSON.parse(JSON.stringify(settingsSchema)),
   saveSettings: (partial) => ipcRenderer.invoke('tm:save-settings', partial)
 });
 
 const themeDisabled = storedSettings.themeDisabled === true;
-const activeTheme = readSavedTheme() ?? 'green';
+const activeTheme = readSavedTheme() ?? settingsSchema.defaultTheme;
 applyEarlyThemeClass(activeTheme, themeDisabled);
 if (!themeDisabled) {
   attachEarlyStyleWhenHeadExists(buildEarlyStyleElement(activeTheme));

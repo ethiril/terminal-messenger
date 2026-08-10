@@ -1794,7 +1794,6 @@ html.tm-platform-darwin #tm-statusline[data-tm-vanilla] {
 #tm-statusline .tm-prompt-net:empty { display: none; }
 /* offline tag: lean red-ish accent without introducing a new palette
    variable - desaturated red overlays cleanly on every theme. */
-html[data-tm-online='false'] #tm-statusline .tm-prompt-net,
 #tm-statusline .tm-prompt-net:not(:empty) {
   color: #d57878 !important;
   opacity: 1;
@@ -2164,6 +2163,47 @@ body.tm-terminal-theme [data-tm-search-flash='true'] [aria-roledescription='mess
     animation: none;
     outline: 1px solid var(--tm-accent);
   }
+}
+
+/* fb's OWN media lightbox (the one actually in use - see the
+   TM_INTERCEPT_MEDIA_CLICKS note in inject/media-viewer.js) renders into a
+   body-level portal carrying neither [role='dialog'] nor [aria-modal], so
+   none of the dialog protections above reach it. Its stage is centred
+   correctly, but the <video> inside sits at the stage's top-left corner, so
+   the clip plays hard against the top-left of the window.
+   re-centre the media within its stage. verified live against this build:
+   this selector matched exactly the lightbox stage and nothing else, with a
+   thread full of inline videos open. the log / chat list / search results are
+   excluded explicitly - videos there are laid out inline and must not move.
+   flex-direction is column so the video and fb's (zero-height) controls
+   sibling keep the stacking order block flow gave them. */
+body.tm-terminal-theme div:has(> video):not(:where(
+  [role='log'] *,
+  [data-tm-thread] *,
+  [data-tm-chat-list] *,
+  [data-tm-search-results] *
+)) {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  /* NOT align-items: center - fb's control strip is a sibling of the <video>
+     that block flow sized to the stage's full width, and centring the cross
+     axis shrink-wrapped it to 0, dragging the play button off with it.
+     stretch keeps that strip exactly the width block flow gave it. */
+  align-items: stretch !important;
+}
+
+/* the <video> carries an explicit width from fb, so `align-items: stretch`
+   leaves it at its natural size - auto margins then centre it horizontally
+   without the parent having to shrink-wrap anything. */
+body.tm-terminal-theme div:has(> video):not(:where(
+  [role='log'] *,
+  [data-tm-thread] *,
+  [data-tm-chat-list] *,
+  [data-tm-search-results] *
+)) > video {
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
 /* ─── media viewer (replaces fb's image lightbox) ─── */
@@ -2986,13 +3026,19 @@ body.tm-terminal-theme [data-tm-day-separator]::after {
   opacity: 0.85;
 }
 
-/* when fb only carries the label on aria, surface it from the data attr
-   we mirrored in JS so the separator isn't blank. */
+/* when fb only carries the label on aria, surface it from the data attr we
+   mirrored in JS so the separator isn't blank. `content` only applies to
+   pseudo-elements, so the label has to ride ::after - ::before stays the
+   (single) flanking rule. */
 body.tm-terminal-theme [data-tm-day-separator][data-tm-day-label]:empty::after {
-  content: '';
-}
-body.tm-terminal-theme [data-tm-day-separator][data-tm-day-label]:empty {
   content: attr(data-tm-day-label);
+  flex: 0 0 auto;
+  height: auto;
+  max-width: none;
+  background: none !important;
+  opacity: 1;
+  color: var(--tm-muted) !important;
+  padding-left: 8px;
 }
 
 /* ─── sender-run header inside the message log ─── */
