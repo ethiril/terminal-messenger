@@ -3,3 +3,20 @@ dist/
 out/
 *.log
 .DS_Store
+
+# local tool state. these hold absolute paths from whichever machine wrote
+# them, so they are per-checkout and never shared. .claude/settings.json (no
+# .local) is intentionally NOT ignored - that one is the project's shared
+# permission set.
+.claude/settings.local.json
+.vscode/
+.idea/
+
+# never commit secrets, even though this app has none to hold today
+.env
+.env.*
+
+# debug eval bridge scratch. point TM_DEBUG_EVAL_FILE at .tm-debug/eval.js and
+# the .out dumps and .png screenshots land here - they are captures of a
+# logged-in Messenger session, so keeping them out of git is not optional.
+.tm-debug/
