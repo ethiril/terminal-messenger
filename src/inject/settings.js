@@ -1,9 +1,22 @@
-/* settings constants live in three places by necessity:
-   - shell/settings-store.js (node main process, validates disk writes)
-   - preload.js (sandboxed renderer, early-paint theme/opacity)
-   - this file (renderer, runtime UI)
-   when adding a theme / density / etc, update all three or values silently
-   round-trip through the sanitiser as defaults. */
+/* settings constants come from shell/settings-schema.js, the single source of
+   truth (it derives the theme list and palette from terminal.css). this
+   bundle can't require() it, so buildInjectionScript writes the serialised
+   copy into window.__TERMINAL_MESSENGER_SCHEMA__ ahead of us. the fallback
+   below only matters if that prelude is missing. */
+const SETTINGS_SCHEMA = window.__TERMINAL_MESSENGER_SCHEMA__ ?? {
+  themes: ['green'],
+  defaultTheme: 'green',
+  densities: ['compact', 'cozy', 'comfy'],
+  defaultDensity: 'cozy',
+  chatFilters: ['all', 'unread'],
+  defaultChatFilter: 'all',
+  minOpacityPct: 20,
+  maxOpacityPct: 100,
+  minFontPx: 9,
+  maxFontPx: 18,
+  defaultFontPx: 12
+};
+
 const STORAGE_KEYS = Object.freeze({
   theme: 'terminalMessenger.theme',
   ultra: 'terminalMessenger.ultra',
@@ -16,23 +29,23 @@ const STORAGE_KEYS = Object.freeze({
   chatListFilter: 'terminalMessenger.chatListFilter'
 });
 
-const VALID_CHAT_FILTERS = ['all', 'unread'];
-const DEFAULT_CHAT_FILTER = 'all';
+const VALID_CHAT_FILTERS = SETTINGS_SCHEMA.chatFilters;
+const DEFAULT_CHAT_FILTER = SETTINGS_SCHEMA.defaultChatFilter;
 
 function normaliseChatFilter(candidate) {
   return VALID_CHAT_FILTERS.includes(candidate) ? candidate : DEFAULT_CHAT_FILTER;
 }
 
-const VALID_THEMES = ['green', 'amber', 'cyan', 'mono', 'mocha', 'twilight', 'neon', 'macchiato', 'frappe', 'latte'];
-const DEFAULT_THEME = 'green';
-const MIN_OPACITY_PCT = 20;
-const MAX_OPACITY_PCT = 100;
+const VALID_THEMES = SETTINGS_SCHEMA.themes;
+const DEFAULT_THEME = SETTINGS_SCHEMA.defaultTheme;
+const MIN_OPACITY_PCT = SETTINGS_SCHEMA.minOpacityPct;
+const MAX_OPACITY_PCT = SETTINGS_SCHEMA.maxOpacityPct;
 
-const VALID_DENSITIES = ['compact', 'cozy', 'comfy'];
-const DEFAULT_DENSITY = 'cozy';
-const MIN_FONT_PX = 9;
-const MAX_FONT_PX = 18;
-const DEFAULT_FONT_PX = 12;
+const VALID_DENSITIES = SETTINGS_SCHEMA.densities;
+const DEFAULT_DENSITY = SETTINGS_SCHEMA.defaultDensity;
+const MIN_FONT_PX = SETTINGS_SCHEMA.minFontPx;
+const MAX_FONT_PX = SETTINGS_SCHEMA.maxFontPx;
+const DEFAULT_FONT_PX = SETTINGS_SCHEMA.defaultFontPx;
 
 function normaliseDensity(candidate) {
   return VALID_DENSITIES.includes(candidate) ? candidate : DEFAULT_DENSITY;

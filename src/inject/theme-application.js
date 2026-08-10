@@ -112,9 +112,27 @@ function applyDocumentTheme() {
    still rAF-aligned for paint timing. */
 let applyScheduled = false;
 let lastApplyAt = 0;
+let applyMissedWhileHidden = false;
 const MIN_APPLY_INTERVAL_MS = 100;
 
+/* fb keeps mutating the DOM while the window is hidden (background tabs of
+   its own, presence pings, chat-list reshuffles), so the body-wide observer
+   kept us re-tagging at ~10Hz for a window nobody is looking at. record that
+   work is pending and flush a single pass when the window comes back. */
+function bindHiddenApplyFlush() {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    if (!applyMissedWhileHidden) return;
+    applyMissedWhileHidden = false;
+    scheduleApply();
+  });
+}
+
 function scheduleApply() {
+  if (document.hidden) {
+    applyMissedWhileHidden = true;
+    return;
+  }
   if (applyScheduled) return;
   applyScheduled = true;
   const now = performance.now();
@@ -242,13 +260,12 @@ function setChatListFilter(candidate) {
   return normalised;
 }
 
+/* deliberately silent: the scroll IS the feedback, and the jump-to-bottom
+   button / shift+G fired a toast on every press. callers that need to report
+   the outcome (the palette) do it from the return value. */
 function scrollLogToBottom() {
   const log = document.querySelector('[role="log"], [data-tm-thread]');
-  if (!log) {
-    showToast('no log to scroll');
-    return false;
-  }
+  if (!log) return false;
   log.scrollTop = log.scrollHeight;
-  showToast('scrolled=bottom');
   return true;
 }

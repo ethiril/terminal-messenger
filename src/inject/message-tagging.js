@@ -1131,7 +1131,11 @@ function looksLikeLinkPreview(anchor) {
    same hierarchy as fb's native render. skips any subtree that contains
    an image to avoid tagging the thumbnail's hidden alt-text wrapper. */
 function tagLinkPreviewParts(anchor) {
-  const seenContainers = new WeakSet();
+  /* a strong Set, not a WeakSet: the containment check below iterates it, and
+     `Array.from(weakSet)` silently yields [] - which disabled the guard
+     entirely and let nested spans get tagged as descriptions. the set is
+     function-local and dropped on return, so there's nothing to leak. */
+  const seenContainers = new Set();
   let textBlockIndex = 0;
   for (const block of anchor.querySelectorAll('div, span')) {
     if (block.querySelector('img, picture, video, canvas')) continue;
@@ -1139,7 +1143,7 @@ function tagLinkPreviewParts(anchor) {
     if (text.length === 0) continue;
     /* only tag the outermost text-bearing wrapper - descending into nested
        spans would tag the same string multiple times and double-style it */
-    if (Array.from(seenContainers).some((container) => container.contains(block))) continue;
+    if ([...seenContainers].some((container) => container.contains(block))) continue;
     seenContainers.add(block);
 
     if (textBlockIndex === 0) {

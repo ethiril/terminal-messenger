@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "start": "electron .",
-    "check": "find src -name '*.js' -exec node --check {} \\;",
+    "check": "find src -name '*.js' -print0 | xargs -0 -n1 node --check && node scripts/check-bundle.js",
     "clean-profile": "node scripts/clean-profile.js",
     "dist": "electron-builder --mac",
     "pack": "electron-builder --mac --dir"

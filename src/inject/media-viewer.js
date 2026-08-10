@@ -323,11 +323,17 @@ function ensureLogVideoControls() {
       if (playResult && typeof playResult.then === 'function') {
         playResult.catch(() => {});
       }
-    } else {
+    } else if (TM_INTERCEPT_MEDIA_CLICKS) {
       /* controls only exist inside the viewer; see comment above. an
          earlier pass may have left controls on - strip them. */
       video.controls = false;
       video.removeAttribute('controls');
+      video.setAttribute('controlslist', 'nodownload');
+      video.setAttribute('preload', 'metadata');
+    } else {
+      /* interception is off, so no click promotes this video into the custom
+         viewer - stripping controls here would leave the video with no way
+         to play at all. leave whatever controls fb rendered in place. */
       video.setAttribute('controlslist', 'nodownload');
       video.setAttribute('preload', 'metadata');
     }

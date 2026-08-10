@@ -30,14 +30,46 @@ function searchMessenger(queryText) {
   }
 
   searchInput.focus();
-  if ('value' in searchInput) {
-    searchInput.value = queryText;
-  } else {
-    searchInput.textContent = queryText;
-  }
-  searchInput.dispatchEvent(new InputEvent('input', { bubbles: true }));
+  writeQueryIntoReactInput(searchInput, queryText);
   showToast(`search: ${queryText || '(empty)'}`);
   return true;
+}
+
+/* fb's search box is a React controlled input. React keeps its own record of
+   the last value it wrote to the node, and assigning `.value` directly leaves
+   that record untouched - so React reads the subsequent input event as "no
+   change" and fb never runs the search. verified live: the old direct
+   assignment put the text on screen and produced zero result rows.
+   write through the native prototype setter instead, which the tracker's
+   instance-level override doesn't intercept. */
+function writeQueryIntoReactInput(inputElement, queryText) {
+  if ('value' in inputElement) {
+    const nativeValueSetter = Object.getOwnPropertyDescriptor(
+      Object.getPrototypeOf(inputElement), 'value'
+    )?.set;
+    if (!nativeValueSetter) {
+      inputElement.value = queryText;
+      inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+      return;
+    }
+    /* clear first: re-running the same query would otherwise write an
+       identical value, which React correctly ignores as a non-change. */
+    nativeValueSetter.call(inputElement, '');
+    inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+    nativeValueSetter.call(inputElement, queryText);
+    inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+    return;
+  }
+
+  /* contenteditable build: insertText fires beforeinput/input the way
+     Lexical expects - the same approach shell/application-menu.js uses for
+     paste. select the existing contents so we replace rather than append. */
+  const contentRange = document.createRange();
+  contentRange.selectNodeContents(inputElement);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(contentRange);
+  document.execCommand('insertText', false, queryText);
 }
 
 /* called from palette `:unread`, which renders its own output text.
@@ -164,23 +196,32 @@ function triggerChatRowAction(actionPattern, friendlyName) {
   let attempts = 0;
   const poll = setInterval(() => {
     attempts += 1;
-    const menu = document.querySelector('[role="menu"]:not([data-tm-handled])');
+    const menu = document.querySelector('[role="menu"]');
     if (menu) {
-      menu.setAttribute('data-tm-handled', 'true');
+      clearInterval(poll);
       const action = findActionButtonInScope(menu, actionPattern);
       if (action) {
         action.click();
         showToast(`${friendlyName} applied`);
-      } else {
-        showToast(`${friendlyName}: not in menu`);
+        return;
       }
-      menu.removeAttribute('data-tm-handled');
-      clearInterval(poll);
+      /* clicking the action dismisses the menu for us; when we can't find it
+         the menu would otherwise sit open over the chat list. */
+      showToast(`${friendlyName}: not in menu`);
+      dismissOpenMenu(menu);
       return;
     }
     if (attempts >= 10) clearInterval(poll);
   }, 60);
   return true;
+}
+
+/* fb closes its menus on Escape; dispatch it at the menu itself so the
+   handler fb attached to the menu (or a document-level one) both see it. */
+function dismissOpenMenu(menu) {
+  const escapeInit = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
+  menu.dispatchEvent(new KeyboardEvent('keydown', escapeInit));
+  menu.dispatchEvent(new KeyboardEvent('keyup', escapeInit));
 }
 
 function findActionButtonInScope(scope, pattern) {
@@ -204,32 +245,50 @@ function muteCursoredChat() {
   return triggerChatRowAction(/^mute\b|^unmute\b/i, 'mute');
 }
 
+/* silent for the same reason as scrollLogToBottom - see the note there. */
 function scrollLogToTop() {
   const log = document.querySelector('[role="log"], [data-tm-thread]');
-  if (!log) {
-    showToast('no log');
-    return false;
-  }
+  if (!log) return false;
   log.scrollTop = 0;
-  showToast('scrolled=top');
   return true;
 }
 
+/* scoped to the chat list, then fb's search-results dropdown. a
+   document-wide SEARCHABLE_ROW_SELECTOR sweep used to reach message rows and
+   unrelated links, so `:goto sara` could click a link inside a message that
+   merely mentioned the name. */
 function gotoChatByName(searchTerm) {
   if (!searchTerm) {
     showToast('usage: :goto <name>');
     return false;
   }
   const lowercaseSearch = searchTerm.toLowerCase();
-  const candidateRows = document.querySelectorAll(SEARCHABLE_ROW_SELECTOR);
-  for (const row of candidateRows) {
+  for (const row of collectGotoCandidateRows()) {
     const label = row.getAttribute('aria-label') ?? row.textContent ?? '';
-    if (label.toLowerCase().includes(lowercaseSearch)) {
-      row.click();
-      showToast(`opened: ${label.slice(0, 30)}`);
-      return true;
-    }
+    if (!label.toLowerCase().includes(lowercaseSearch)) continue;
+    /* prefer the inner link: outer rows sometimes swallow the click
+       without navigating (see openChatListCursorTarget). */
+    (row.querySelector('a[role="link"], [role="link"]') ?? row).click();
+    showToast(`opened: ${label.slice(0, 30)}`);
+    return true;
   }
   showToast(`no chat matching "${searchTerm}"`);
   return false;
+}
+
+/* chat-list rows first, then the tagged search-results dropdown, so an open
+   dropdown never outranks a chat the user already has in the sidebar.
+   tagChatSearchResults marks both the results container and the individual
+   result links, so a scope can itself be a candidate row. */
+function collectGotoCandidateRows() {
+  const rows = [];
+  const scopes = [
+    ...document.querySelectorAll('[data-tm-chat-list]'),
+    ...document.querySelectorAll('[data-tm-search-results]')
+  ];
+  for (const scope of scopes) {
+    if (scope.matches(SEARCHABLE_ROW_SELECTOR)) rows.push(scope);
+    rows.push(...scope.querySelectorAll(SEARCHABLE_ROW_SELECTOR));
+  }
+  return rows;
 }

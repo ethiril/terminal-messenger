@@ -123,6 +123,9 @@ function bindKeyboardShortcuts() {
 function startMutationObserver() {
   if (mutationObserverStarted || !document.body) return;
   mutationObserverStarted = true;
+  /* scheduleApply drops passes while the window is hidden; this flushes the
+     one it owes as soon as the window is visible again. */
+  bindHiddenApplyFlush();
   /* childList catches subtree swaps, but React re-renders often rewrite
      the style attribute IN PLACE (no node churn) - wiping the inline
      layout restructureMediaReply applied to media-reply rows, which then
