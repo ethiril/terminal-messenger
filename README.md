@@ -164,6 +164,36 @@ You can swap `homeUrl` to `https://www.messenger.com/` if that works better in y
 - **Ultra mode** — terminal mode + hides the chat list, header chrome, and side rails so only the active conversation + composer are on screen. Toggle with `Cmd+Shift+U`.
 - **Vanilla mode** — strips every `tm-*` class from `<html>`/`<body>` and removes the statusline, restoring Facebook's native Messenger UI without unloading anything. Toggle with `Cmd+Shift+Y` (or `:vanilla` from the palette) to flip back to terminal mode.
 
+## Development
+
+### Debug eval bridge
+
+Styling this app means checking work against Facebook's live DOM, which is generated markup that changes without notice. The debug eval bridge makes that loop runnable from a terminal instead of by hand in DevTools.
+
+Set `TM_DEBUG_EVAL_FILE` to a scratch path and start the app:
+
+```bash
+mkdir -p .tm-debug
+TM_DEBUG_EVAL_FILE=.tm-debug/eval.js npm start
+```
+
+The app then asks, in a dialog, whether to enable the bridge. Nothing is evaluated unless you accept. Once accepted, writing JavaScript to that file runs it in the Messenger renderer and produces:
+
+- `.tm-debug/eval.js.out` — the return value, JSON-stringified when it isn't a string, or `ERROR: <message>` if the command threw,
+- `.tm-debug/eval.js.png` — a screenshot of the window taken after the command ran.
+
+```bash
+echo 'document.querySelectorAll(".tm-statusline").length' > .tm-debug/eval.js
+cat .tm-debug/eval.js.out
+```
+
+Notes:
+
+- **Each write must be self-contained.** The file is polled and each change runs as one independent command, so state doesn't carry between writes. Facebook also re-anchors its virtualised message list between commands, which means a selector resolved in one write may be stale by the next — resolve and use it in the same command.
+- **Consent is per launch and is not remembered.** Quitting the app turns the bridge off; the next launch asks again. There is no persisted opt-in by design.
+- **The artifacts contain your conversations.** `.out` dumps and `.png` screenshots are captures of a logged-in session, written unencrypted. `.tm-debug/` is gitignored for this reason — keep the path inside it.
+- Set no env var and the bridge does not exist: the poll timer is never created, so a normal build and a normal `npm start` carry none of this.
+
 ## Privacy and safety model
 
 This is intentionally a visual wrapper. It avoids:
@@ -173,6 +203,8 @@ This is intentionally a visual wrapper. It avoids:
 - background scraping,
 - storing copies of conversations,
 - bypassing Facebook login or security flows.
+
+The one deliberate exception is the [debug eval bridge](#debug-eval-bridge), which does read the live DOM and write screenshots to disk. It is development tooling, off by default, and gated behind both an environment variable and an explicit dialog — but it is a real code path into a logged-in session, so it is called out here rather than buried.
 
 Any CSS/DOM selectors that affect Facebook's interface may break when Facebook changes the web app.
 

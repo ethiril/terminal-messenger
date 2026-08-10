@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, session } = require('electron');
 const { loadAppConfig, isAllowedMessengerUrl } = require('./shell/app-config');
 const { buildApplicationMenu } = require('./shell/application-menu');
 const { createMessengerWindow } = require('./shell/messenger-window');
@@ -9,6 +9,7 @@ const SESSION_PARTITION = 'persist:terminal-messenger';
 const SAFE_PERMISSIONS = ['notifications', 'clipboard-read', 'clipboard-sanitized-write'];
 const MIN_OPACITY_PCT = 20;
 const MAX_OPACITY_PCT = 100;
+const DEBUG_EVAL_POLL_MS = 400;
 
 const appConfig = loadAppConfig();
 let storedSettings = {};
@@ -77,36 +78,93 @@ function registerIpcHandlers() {
   });
 }
 
-/* dev-only live-debug bridge, enabled by TM_DEBUG_EVAL_FILE=<path>. polls
-   the file; when its contents change, runs them as JS in the messenger
-   renderer, writes the result to <path>.out and a window screenshot to
-   <path>.png. lets layout work be inspected/iterated against the real fb
-   DOM from a terminal without devtools. inert unless the env var is set. */
+/* consent gate for the debug bridge below. an env var on its own is too weak a
+   trigger for something this privileged: a leftover export in a shell profile,
+   an inherited environment from a launcher, or a sourced dotfile would all arm
+   it silently, and the person at the keyboard would never know their open
+   conversations were being evaluated and screenshotted. so we ask, and we ask
+   before the first eval rather than after.
+
+   the grant is per launch and deliberately not persisted - there is no "don't
+   ask again", because the whole point is that arming it stays a conscious act.
+   quitting the app revokes it. */
+function confirmDebugEvalBridge(evalFilePath, parentWindow) {
+  const choice = dialog.showMessageBoxSync(parentWindow, {
+    type: 'warning',
+    buttons: ['Cancel', 'Enable debug bridge'],
+    defaultId: 0,
+    /* cancel is the default and the escape route: a stray return key or a
+       dismissed dialog must leave the bridge off, never on. */
+    cancelId: 0,
+    noLink: true,
+    title: 'Enable debug eval bridge?',
+    message: 'TM_DEBUG_EVAL_FILE is set. Enable the debug eval bridge?',
+    detail:
+      `Watching: ${evalFilePath}\n\n` +
+      'While this is enabled, anything written to that file runs as JavaScript ' +
+      'inside your logged-in Messenger session. Results are written to ' +
+      `${evalFilePath}.out and a screenshot of the window to ${evalFilePath}.png ` +
+      'after every run.\n\n' +
+      'That is full read access to your open conversations, on disk, unencrypted. ' +
+      'Only enable this if you set the variable yourself for development.\n\n' +
+      'This choice is not remembered - quitting the app turns the bridge off again.'
+  });
+  return choice === 1;
+}
+
+/* dev-only live-debug bridge, enabled by TM_DEBUG_EVAL_FILE=<path> and by the
+   consent dialog above. polls the file; when its contents change, runs them as
+   JS in the messenger renderer, writes the result to <path>.out and a window
+   screenshot to <path>.png. lets layout work be inspected and iterated against
+   the real fb DOM from a terminal without devtools.
+
+   inert unless the env var is set, and inert unless the dialog is accepted, so
+   a shipped build with neither does none of this. */
 function setupDebugEvalBridge(messengerWindow) {
   const evalFilePath = process.env.TM_DEBUG_EVAL_FILE;
   if (!evalFilePath) return;
+  if (!confirmDebugEvalBridge(evalFilePath, messengerWindow)) {
+    console.warn('[terminal-messenger] debug eval bridge declined - TM_DEBUG_EVAL_FILE ignored for this launch');
+    return;
+  }
   const fs = require('node:fs');
   let lastEvalContent = '';
   const pollTimer = setInterval(async () => {
+    /* the window can go away mid-poll (cmd-Q, window closed); stop the timer
+       rather than let executeJavaScript throw on a dead webContents. */
     if (messengerWindow.isDestroyed()) { clearInterval(pollTimer); return; }
     let content;
+    /* a missing file is the normal state before the first command is written,
+       so an unreadable path is a skip, not an error. */
     try { content = fs.readFileSync(evalFilePath, 'utf8'); } catch { return; }
+    /* we poll far faster than commands arrive, so only a *change* counts as a
+       new command - otherwise one written command would re-run several times a
+       second for as long as it sat in the file. */
     if (!content.trim() || content === lastEvalContent) return;
+    /* recorded before the eval runs, not after: a command that throws must not
+       be retried on every subsequent tick. */
     lastEvalContent = content;
     try {
+      /* userGesture=true so gesture-gated APIs (focus, clipboard, media) behave
+         the same as they would under a real click. */
       const result = await messengerWindow.webContents.executeJavaScript(content, true);
       fs.writeFileSync(
         `${evalFilePath}.out`,
         typeof result === 'string' ? result : JSON.stringify(result, null, 2) ?? String(result)
       );
     } catch (error) {
+      /* failures go to the same .out file the caller is already tailing -
+         a silent failure looks identical to a hung command from there. */
       fs.writeFileSync(`${evalFilePath}.out`, `ERROR: ${error.message}`);
     }
+    /* screenshot after every command: the reason for the bridge is checking how
+       something *looks*, which the return value alone can't answer. best-effort
+       because capturePage fails on a minimised or offscreen window. */
     try {
       const image = await messengerWindow.webContents.capturePage();
       fs.writeFileSync(`${evalFilePath}.png`, image.toPNG());
     } catch {}
-  }, 400);
+  }, DEBUG_EVAL_POLL_MS);
 }
 
 app.whenReady().then(() => {
